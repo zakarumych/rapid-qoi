@@ -1,4 +1,4 @@
-# rapid-rapid-qoi
+# rapid-qoi
 
 [![crates](https://img.shields.io/crates/v/rapid-qoi.svg?style=for-the-badge&label=rapid-qoi)](https://crates.io/crates/rapid-qoi)
 [![docs](https://img.shields.io/badge/docs.rs-rapid-qoi-66c2a5?style=for-the-badge&labelColor=555555&logoColor=white)](https://docs.rs/rapid-qoi)
