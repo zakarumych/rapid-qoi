@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "png.h": "c",
+        "dirent.h": "c"
+    }
+}
