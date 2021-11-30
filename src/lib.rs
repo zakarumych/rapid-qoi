@@ -675,12 +675,9 @@ impl Qoi {
         let has_alpha = self.color_space.alpha_srgb.is_some();
         let channels = has_alpha as usize + 3;
 
-        let mut run = 0u16;
         let mut px_pos = 0;
         while px_pos < px_len {
-            if run > 0 {
-                run -= 1;
-            } else if reader.len >= QOI_PADDING {
+            if reader.len >= QOI_PADDING {
                 let b1 = unsafe { reader.read_8() };
 
                 if (b1 & QOI_MASK_2) == QOI_INDEX {
@@ -689,9 +686,6 @@ impl Qoi {
                     let mut run = (b1 & 0x1f) + 1;
 
                     while run > 0 && px_pos < px_len {
-                        run -= 1;
-                        px_pos += channels;
-
                         match has_alpha {
                             true => px.write_rgba(unsafe {
                                 output.get_unchecked_mut(px_pos..px_pos + 4)
@@ -699,15 +693,15 @@ impl Qoi {
                             false => px
                                 .write_rgb(unsafe { output.get_unchecked_mut(px_pos..px_pos + 3) }),
                         }
+                        run -= 1;
+                        px_pos += channels;
                     }
+                    continue;
                 } else if (b1 & QOI_MASK_3) == QOI_RUN_16 {
                     let b2 = unsafe { reader.read_8() };
                     let mut run = ((((b1 & 0x1f) as u16) << 8) | (b2 as u16)) + 33;
 
                     while run > 0 && px_pos < px_len {
-                        run -= 1;
-                        px_pos += channels;
-
                         match has_alpha {
                             true => px.write_rgba(unsafe {
                                 output.get_unchecked_mut(px_pos..px_pos + 4)
@@ -715,7 +709,10 @@ impl Qoi {
                             false => px
                                 .write_rgb(unsafe { output.get_unchecked_mut(px_pos..px_pos + 3) }),
                         }
+                        run -= 1;
+                        px_pos += channels;
                     }
+                    continue;
                 } else if (b1 & QOI_MASK_2) == QOI_DIFF_8 {
                     px.r = (px.r as i16 + ((b1 >> 4) & 0x03) as i16 - 1) as u8;
                     px.g = (px.g as i16 + ((b1 >> 2) & 0x03) as i16 - 1) as u8;

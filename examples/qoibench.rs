@@ -193,8 +193,8 @@ fn main() -> Result<(), ()> {
     let mut args = std::env::args();
 
     if args.len() < 3 {
-        println!("Usage: qoibench <iterations> <directory>");
-        println!("Example: qoibench 10 images/textures/");
+        eprintln!("Usage: qoibench <iterations> <directory>");
+        eprintln!("Example: qoibench 10 images/textures/");
         return Err(());
     }
 
