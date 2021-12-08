@@ -113,7 +113,7 @@
 //! encounter is 5 bytes (QOI_COLOR with RGBA set), with this padding we just have
 //! to check for an overrun once per decode loop iteration.
 //!
-#![no_std]
+#![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -122,6 +122,7 @@ extern crate alloc;
 use alloc::{vec, vec::Vec};
 
 use core::{
+    fmt::{self, Display},
     mem::transmute,
     ptr::{copy_nonoverlapping, write_bytes},
 };
@@ -147,49 +148,49 @@ const QOI_MAGIC: u32 = u32::from_be_bytes(*b"qoif");
 const QOI_HEADER_SIZE: usize = 14;
 const QOI_PADDING: usize = 4;
 
-pub struct UnsafeWriter {
+struct UnsafeWriter {
     ptr: *mut u8,
     len: usize,
 }
 
 impl UnsafeWriter {
     #[inline(always)]
-    pub unsafe fn fill(&mut self, v: u8, count: usize) {
+    unsafe fn fill(&mut self, v: u8, count: usize) {
         write_bytes(self.ptr, v, count);
         self.ptr = self.ptr.add(count);
         self.len -= count;
     }
 
     #[inline(always)]
-    pub unsafe fn write_8(&mut self, v: u8) {
+    unsafe fn write_8(&mut self, v: u8) {
         *self.ptr = v;
         self.ptr = self.ptr.add(1);
         self.len -= 1;
     }
 
     #[inline(always)]
-    pub unsafe fn write_16(&mut self, v: u16) {
+    unsafe fn write_16(&mut self, v: u16) {
         copy_nonoverlapping(v.to_be_bytes().as_ptr(), self.ptr, 2);
         self.ptr = self.ptr.add(2);
         self.len -= 2;
     }
 
     #[inline(always)]
-    pub unsafe fn write_32(&mut self, v: u32) {
+    unsafe fn write_32(&mut self, v: u32) {
         copy_nonoverlapping(v.to_be_bytes().as_ptr(), self.ptr, 4);
         self.ptr = self.ptr.add(4);
         self.len -= 4;
     }
 }
 
-pub struct UnsafeReader {
+struct UnsafeReader {
     ptr: *const u8,
     len: usize,
 }
 
 impl UnsafeReader {
     #[inline(always)]
-    pub unsafe fn read_8(&mut self) -> u8 {
+    unsafe fn read_8(&mut self) -> u8 {
         let v = *self.ptr;
         self.ptr = self.ptr.add(1);
         self.len -= 1;
@@ -197,7 +198,7 @@ impl UnsafeReader {
     }
 
     #[inline(always)]
-    pub unsafe fn read_16(&mut self) -> u16 {
+    unsafe fn read_16(&mut self) -> u16 {
         let v = u16::from_be_bytes(*(self.ptr as *const [u8; 2]));
         self.ptr = self.ptr.add(2);
         self.len -= 2;
@@ -205,7 +206,7 @@ impl UnsafeReader {
     }
 
     #[inline(always)]
-    pub unsafe fn read_32(&mut self) -> u32 {
+    unsafe fn read_32(&mut self) -> u32 {
         let v = u32::from_be_bytes(*(self.ptr as *const [u8; 4]));
         self.ptr = self.ptr.add(4);
         self.len -= 4;
@@ -395,19 +396,53 @@ pub struct Qoi {
     pub color_space: ColorSpace,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum EncodeError {
     NotEnoughPixelData,
     OutputIsTooSmall,
 }
 
-#[derive(Debug)]
+impl Display for EncodeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            EncodeError::NotEnoughPixelData => {
+                f.write_str("Pixels buffer does not contain enough data")
+            }
+            EncodeError::OutputIsTooSmall => {
+                f.write_str("Output buffer is too small to fit encoded image")
+            }
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for EncodeError {}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum DecodeError {
     DataIsTooSmall,
     InvalidMagic,
     InvalidChannelsValue,
     OutputIsTooSmall,
 }
+
+impl Display for DecodeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DecodeError::DataIsTooSmall => f.write_str("Encoded data slice is too small"),
+            DecodeError::InvalidMagic => {
+                f.write_str("Encoded data does not start with 'qoif' code")
+            }
+            DecodeError::InvalidChannelsValue => f.write_str("Numbers of channels is not 3 or 4"),
+            DecodeError::OutputIsTooSmall => {
+                f.write_str("Output buffer is too small to fit decoded image")
+            }
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for DecodeError {}
 
 impl Qoi {
     /// Returns maximum size of the the `Qoi::encode` output size.

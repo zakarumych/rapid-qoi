@@ -1,6 +1,6 @@
 [package]
 name = "rapid-qoi"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2018"
 authors = []
 license = "MIT OR Apache-2.0"
@@ -14,7 +14,8 @@ categories = ["algorithms", "compression", "multimedia::encoding", "no-std"]
 
 [features]
 alloc = []
-default = ["alloc"]
+std = ["alloc"]
+default = ["std"]
 
 [dev-dependencies]
 image = "0.23"
