@@ -56,6 +56,7 @@ struct BenchmarkResult {
     w: u32,
     h: u32,
     qoi: BenchmarkLibResult,
+    qoi_rs: BenchmarkLibResult,
     rapid_qoi: BenchmarkLibResult,
 }
 
@@ -87,12 +88,7 @@ fn benchmark_image(path: &Path, runs: u32) -> BenchmarkResult {
     let pixels = image.as_raw();
 
     // Load the encoded PNG, encoded QOI and raw pixels into memory
-    // let encoded_qoi =
-    //     qoi::QoiEncode::qoi_encode_to_vec(pixels, w as u32, h as u32, qoi::Channels::Four, 0x0f)
-    //         .unwrap();
-
-    // Load the encoded PNG, encoded QOI and raw pixels into memory
-    let encoded_qoi = rapid_qoi::Qoi {
+    let encoded = rapid_qoi::Qoi {
         width: w,
         height: h,
         color_space: rapid_qoi::ColorSpace::SRGBA,
@@ -100,11 +96,24 @@ fn benchmark_image(path: &Path, runs: u32) -> BenchmarkResult {
     .encode_alloc(pixels)
     .unwrap();
 
+    let image_qoi_rs = qoi_rs::Image {
+        pixels: pixels.clone().into_boxed_slice(),
+        width: w as u16,
+        height: h as u16,
+    };
+
+    let encoded_qoi_rs = qoi_rs::encode(image_qoi_rs, 4).unwrap();
+
     let mut res = BenchmarkResult {
         px: image.width() as u64 * image.height() as u64,
         w,
         h,
         qoi: BenchmarkLibResult {
+            size: 0,
+            encode_time: Duration::ZERO,
+            decode_time: Duration::ZERO,
+        },
+        qoi_rs: BenchmarkLibResult {
             size: 0,
             encode_time: Duration::ZERO,
             decode_time: Duration::ZERO,
@@ -118,15 +127,39 @@ fn benchmark_image(path: &Path, runs: u32) -> BenchmarkResult {
 
     // Decoding
 
-    benchmark_fn(runs, &mut res.rapid_qoi.decode_time, || {
-        rapid_qoi::Qoi::decode_alloc(&encoded_qoi).unwrap();
+    benchmark_fn(runs, &mut res.qoi.decode_time, || {
+        qoi::QoiDecode::qoi_decode_to_vec(&encoded, Some(qoi::Channels::Four)).unwrap();
     });
 
-    benchmark_fn(runs, &mut res.qoi.decode_time, || {
-        qoi::QoiDecode::qoi_decode_to_vec(&encoded_qoi, Some(qoi::Channels::Four)).unwrap();
+    benchmark_fn(runs, &mut res.qoi_rs.decode_time, || {
+        qoi_rs::decode(&encoded_qoi_rs, 4).unwrap();
+    });
+
+    benchmark_fn(runs, &mut res.rapid_qoi.decode_time, || {
+        rapid_qoi::Qoi::decode_alloc(&encoded).unwrap();
     });
 
     // Encoding
+
+    let size = &mut res.qoi.size;
+    benchmark_fn(runs, &mut res.qoi.encode_time, || {
+        let encoded =
+            qoi::QoiEncode::qoi_encode_to_vec(pixels, w as u32, h as u32, qoi::Channels::Four, 0xf)
+                .unwrap();
+        *size = encoded.len() as u64;
+    });
+
+    let size = &mut res.qoi_rs.size;
+    benchmark_fn(runs, &mut res.qoi_rs.encode_time, || {
+        let image_qoi_rs = qoi_rs::Image {
+            pixels: pixels.clone().into_boxed_slice(),
+            width: w as u16,
+            height: h as u16,
+        };
+
+        let encoded_qoi_rs = qoi_rs::encode(image_qoi_rs, 4).unwrap();
+        *size = encoded_qoi_rs.len() as u64;
+    });
 
     let size = &mut res.rapid_qoi.size;
     benchmark_fn(runs, &mut res.rapid_qoi.encode_time, || {
@@ -139,23 +172,15 @@ fn benchmark_image(path: &Path, runs: u32) -> BenchmarkResult {
         *size = encoded.len() as u64;
     });
 
-    let size = &mut res.qoi.size;
-    benchmark_fn(runs, &mut res.qoi.encode_time, || {
-        let encoded =
-            qoi::QoiEncode::qoi_encode_to_vec(pixels, w as u32, h as u32, qoi::Channels::Four, 0xf)
-                .unwrap();
-        *size = encoded.len() as u64;
-    });
-
     res
 }
 
 fn benchmark_print_result(head: &str, res: &BenchmarkResult) {
     let px = res.px as f64;
     println!("## {} size: {}x{}", head, res.w, res.h);
-    println!("         decode ms   encode ms   decode mpps   encode mpps   size kb");
+    println!("          decode ms   encode ms   decode mpps   encode mpps   size kb");
     println!(
-        "qoi:      {:8.3}    {:8.3}      {:8.3}      {:8.3}  {:8}",
+        "qoi:       {:8.3}    {:8.3}      {:8.3}      {:8.3}  {:8}",
         res.qoi.decode_time.as_secs_f64() * 1000.0,
         res.qoi.encode_time.as_secs_f64() * 1000.0,
         if res.qoi.decode_time.is_zero() {
@@ -169,6 +194,22 @@ fn benchmark_print_result(head: &str, res: &BenchmarkResult) {
             px / (res.qoi.encode_time.as_secs_f64() * 1000_000.0)
         },
         res.qoi.size / 1024,
+    );
+    println!(
+        "qoi_rs:    {:8.3}    {:8.3}      {:8.3}      {:8.3}  {:8}",
+        res.qoi_rs.decode_time.as_secs_f64() * 1000.0,
+        res.qoi_rs.encode_time.as_secs_f64() * 1000.0,
+        if res.qoi_rs.decode_time.is_zero() {
+            0.0
+        } else {
+            px / (res.qoi_rs.decode_time.as_secs_f64() * 1000_000.0)
+        },
+        if res.qoi_rs.encode_time.is_zero() {
+            0.0
+        } else {
+            px / (res.qoi_rs.encode_time.as_secs_f64() * 1000_000.0)
+        },
+        res.qoi_rs.size / 1024,
     );
     println!(
         "rapid_qoi: {:8.3}    {:8.3}      {:8.3}      {:8.3}  {:8}",
@@ -207,6 +248,11 @@ fn main() -> Result<(), ()> {
             encode_time: Duration::ZERO,
             decode_time: Duration::ZERO,
         },
+        qoi_rs: BenchmarkLibResult {
+            size: 0,
+            encode_time: Duration::ZERO,
+            decode_time: Duration::ZERO,
+        },
         rapid_qoi: BenchmarkLibResult {
             size: 0,
             encode_time: Duration::ZERO,
@@ -239,9 +285,14 @@ fn main() -> Result<(), ()> {
                 benchmark_print_result(filepath.to_string_lossy().as_ref(), &res);
 
                 totals.px += res.px;
+
                 totals.qoi.encode_time += res.qoi.encode_time;
                 totals.qoi.decode_time += res.qoi.decode_time;
                 totals.qoi.size += res.qoi.size;
+
+                totals.qoi_rs.encode_time += res.qoi_rs.encode_time;
+                totals.qoi_rs.decode_time += res.qoi_rs.decode_time;
+                totals.qoi_rs.size += res.qoi_rs.size;
 
                 totals.rapid_qoi.encode_time += res.rapid_qoi.encode_time;
                 totals.rapid_qoi.decode_time += res.rapid_qoi.decode_time;
@@ -251,9 +302,14 @@ fn main() -> Result<(), ()> {
     }
 
     totals.px /= count as u64;
+
     totals.qoi.encode_time /= count;
     totals.qoi.decode_time /= count;
     totals.qoi.size /= count as u64;
+
+    totals.qoi_rs.encode_time /= count;
+    totals.qoi_rs.decode_time /= count;
+    totals.qoi_rs.size /= count as u64;
 
     totals.rapid_qoi.encode_time /= count;
     totals.rapid_qoi.decode_time /= count;

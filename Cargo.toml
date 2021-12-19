@@ -20,3 +20,4 @@ default = ["std"]
 [dev-dependencies]
 image = "0.23"
 qoi = "0.3"
+qoi_rs = "0.1"
