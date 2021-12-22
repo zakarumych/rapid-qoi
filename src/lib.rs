@@ -345,7 +345,8 @@ pub enum Colors {
 }
 
 impl Colors {
-    pub fn has_alpha(&self) -> bool {
+    #[inline(always)]
+    pub const fn has_alpha(&self) -> bool {
         match self {
             Colors::Rgb | Colors::Srgb => false,
             Colors::Rgba | Colors::SrgbLinA => true,

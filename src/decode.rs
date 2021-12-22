@@ -69,7 +69,7 @@ impl Qoi {
         bytes: &[u8],
         output: &mut [u8],
     ) -> Result<(), DecodeError> {
-        assert_eq!(HAS_ALPHA, self.colors.has_alpha());
+        debug_assert_eq!(HAS_ALPHA, self.colors.has_alpha());
 
         let px_len = self.decoded_size();
 
