@@ -11,11 +11,11 @@
 //! A QOI file has a 14 byte header, followed by any number of data "chunks" and an
 //! 8-byte end marker.
 //! struct qoi_header_t {
-//! 	char     magic[4];   // magic bytes "qoif"
-//! 	uint32_t width;      // image width in pixels (BE)
-//! 	uint32_t height;     // image height in pixels (BE)
-//! 	uint8_t  channels;   // 3 = RGB, 4 = RGBA
-//! 	uint8_t  colorspace; // 0 = sRGB with linear alpha, 1 = all channels linear
+//!     char     magic[4];   // magic bytes "qoif"
+//!     uint32_t width;      // image width in pixels (BE)
+//!     uint32_t height;     // image height in pixels (BE)
+//!     uint8_t  channels;   // 3 = RGB, 4 = RGBA
+//!     uint8_t  colorspace; // 0 = sRGB with linear alpha, 1 = all channels linear
 //! };
 //! Images are encoded from top to bottom, left to right. The decoder and encoder
 //! start with {r: 0, g: 0, b: 0, a: 255} as the previous pixel value. An image is
@@ -33,7 +33,7 @@
 //! the color value. In the encoder, if the pixel value at the index matches the
 //! current pixel, this index position is written to the stream as QOI_OP_INDEX.
 //! The hash function for the index is:
-//! 	index_position = (r * 3 + g * 5 + b * 7 + a * 11) % 64
+//!     index_position = (r * 3 + g * 5 + b * 7 + a * 11) % 64
 //! Each chunk starts with a 2- or 8-bit tag, followed by a number of data bits. The
 //! bit length of chunks is divisible by 8 - i.e. all chunks are byte aligned. All
 //! values encoded in these data bits have the most significant bit on the left.
@@ -79,8 +79,8 @@
 //! The green channel is used to indicate the general direction of change and is
 //! encoded in 6 bits. The red and blue channels (dr and db) base their diffs off
 //! of the green channel difference and are encoded in 4 bits. I.e.:
-//! 	dr_dg = (last_px.r - cur_px.r) - (last_px.g - cur_px.g)
-//! 	db_dg = (last_px.b - cur_px.b) - (last_px.g - cur_px.g)
+//!     dr_dg = (last_px.r - cur_px.r) - (last_px.g - cur_px.g)
+//!     db_dg = (last_px.b - cur_px.b) - (last_px.g - cur_px.g)
 //! The difference to the current channel values are using a wraparound operation,
 //! so "10 - 13" will result in 253, while "250 + 7" will result in 1.
 //! Values are stored as unsigned integers with a bias of 32 for the green channel
@@ -191,8 +191,6 @@ const QOI_OP_LUMA: u8 = 0x80; /* 10xxxxxx */
 const QOI_OP_RUN: u8 = 0xc0; /* 11xxxxxx */
 const QOI_OP_RGB: u8 = 0xfe; /* 11111110 */
 const QOI_OP_RGBA: u8 = 0xff; /* 11111111 */
-
-const QOI_MASK_2: u8 = 0xc0; /* 11000000 */
 
 #[inline(always)]
 const fn qui_color_hash(c: Rgba) -> usize {

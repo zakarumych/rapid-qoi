@@ -165,7 +165,7 @@ impl Qoi {
             px_pos += channels;
         }
 
-        return Ok(());
+        Ok(())
     }
 
     #[cfg(feature = "alloc")]
