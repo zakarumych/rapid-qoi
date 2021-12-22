@@ -74,97 +74,49 @@ impl Qoi {
             if px == px_prev {
                 run += 1;
 
-                if run == 0x2020 || chunks.len() == 0 {
-                    if run < 33 {
-                        run -= 1;
-                        unsafe { writer.write_8(QOI_RUN_8 | run as u8) }
-                    } else {
-                        run -= 33;
-                        unsafe {
-                            writer.write_16(((QOI_RUN_16 as u16) << 8) | run);
-                        }
-                    }
+                if run == 62 || chunks.len() == 0 {
+                    unsafe { writer.write_8(QOI_OP_RUN | (run - 1) as u8) }
                     run = 0;
                 }
             } else {
                 if run > 0 {
-                    if run < 33 {
-                        run -= 1;
-                        unsafe { writer.write_8(QOI_RUN_8 | run as u8) }
-                    } else {
-                        run -= 33;
-                        unsafe {
-                            writer.write_16(((QOI_RUN_16 as u16) << 8) | run);
-                        }
-                    }
+                    unsafe { writer.write_8(QOI_OP_RUN | (run - 1) as u8) }
                     run = 0;
                 }
 
                 let index_pos = qui_color_hash(px);
 
                 if index[index_pos] == px {
-                    unsafe { writer.write_8(QOI_INDEX | index_pos as u8) }
+                    unsafe { writer.write_8(QOI_OP_INDEX | index_pos as u8) }
                 } else {
                     index[index_pos] = px;
 
-                    let v = px.var(&px_prev);
+                    if px_prev.a == px.a {
+                        let v = px.var(&px_prev);
 
-                    if v.a == 0 {
-                        if let Some(diff) = v.diff8() {
+                        if let Some(diff) = v.diff() {
                             unsafe {
-                                // writer.write_8(
-                                //     QOI_DIFF_8
-                                //         | ((v.r + 2) << 4) as u8
-                                //         | ((v.g + 2) << 2) as u8
-                                //         | (v.b + 2) as u8,
-                                // );
                                 writer.write_8(diff);
                             }
-                            px_prev = px;
-                            continue;
-                        } else if let Some(diff) = v.diff16() {
+                        } else if let Some(luma) = v.luma() {
                             unsafe {
-                                //     writer.write_8(QOI_DIFF_16 | (v.r + 16) as u8);
-                                //     writer.write_8(((v.g + 8) << 4) as u8 | (v.b + 8) as u8);
-                                writer.write_16(diff);
+                                writer.write_16(luma);
                             }
-                            px_prev = px;
-                            continue;
-                        }
-                    }
-
-                    if let Some(diff) = v.diff24() {
-                        unsafe {
-                            // writer.write_8(QOI_DIFF_24 | ((v.r + 16) >> 1) as u8);
-                            // writer.write_8(
-                            //     ((v.r + 16) << 7) as u8
-                            //         | ((v.g + 16) << 2) as u8
-                            //         | ((v.b + 16) >> 3) as u8,
-                            // );
-                            // writer.write_8(((v.b + 16) << 5) as u8 | (v.a + 16) as u8);
-                            writer.write_24(diff);
+                        } else {
+                            unsafe {
+                                writer.write_8(QOI_OP_RGB);
+                                writer.write_8(px.r);
+                                writer.write_8(px.g);
+                                writer.write_8(px.b);
+                            }
                         }
                     } else {
                         unsafe {
-                            let ptr = writer.skip_8();
-                            let mut f = 0;
-                            if v.r != 0 {
-                                f |= 8;
-                                writer.write_8(px.r);
-                            }
-                            if v.g != 0 {
-                                f |= 4;
-                                writer.write_8(px.g);
-                            }
-                            if v.b != 0 {
-                                f |= 2;
-                                writer.write_8(px.b);
-                            }
-                            if v.a != 0 {
-                                f |= 1;
-                                writer.write_8(px.a);
-                            }
-                            *ptr = QOI_COLOR | f;
+                            writer.write_8(QOI_OP_RGBA);
+                            writer.write_8(px.r);
+                            writer.write_8(px.g);
+                            writer.write_8(px.b);
+                            writer.write_8(px.a);
                         }
                     }
                 }
@@ -176,7 +128,7 @@ impl Qoi {
             return Err(EncodeError::OutputIsTooSmall);
         }
 
-        unsafe { writer.fill(0, QOI_PADDING) };
+        unsafe { writer.pad() };
 
         let size = output.len() - writer.len;
 
