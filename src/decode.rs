@@ -106,48 +106,52 @@ impl Qoi {
             if likely(reader.len > QOI_PADDING) {
                 let b1 = unsafe { reader.read_8() };
 
-                if b1 == QOI_OP_RGB {
-                    unsafe {
+                match b1 {
+                    0b11111110 => unsafe {
                         reader.read_rgb(&mut px);
-                    }
-                } else if b1 == QOI_OP_RGBA {
-                    unsafe {
+                    },
+                    0b11111111 => unsafe {
                         reader.read_rgba(&mut px);
+                    },
+                    0b00000000..=0b00111111 => {
+                        px = index[b1 as usize];
                     }
-                } else if (b1 & QOI_MASK_2) == QOI_OP_INDEX {
-                    px = index[b1 as usize];
-                } else if (b1 & QOI_MASK_2) == QOI_OP_DIFF {
-                    px.r = px.r.wrapping_add(((b1 >> 4) & 0x03).wrapping_sub(2));
-                    px.g = px.g.wrapping_add(((b1 >> 2) & 0x03).wrapping_sub(2));
-                    px.b = px.b.wrapping_add((b1 & 0x03).wrapping_sub(2));
-                } else if (b1 & QOI_MASK_2) == QOI_OP_LUMA {
-                    let b2 = unsafe { reader.read_8() };
-
-                    let vg = (b1 & 0x3f).wrapping_sub(32);
-                    let vr = ((b2 >> 4) & 0x0f).wrapping_sub(8).wrapping_add(vg);
-                    let vb = (b2 & 0x0f).wrapping_sub(8).wrapping_add(vg);
-
-                    px.r = px.r.wrapping_add(vr);
-                    px.g = px.g.wrapping_add(vg);
-                    px.b = px.b.wrapping_add(vb);
-                } else if (b1 & QOI_MASK_2) == QOI_OP_RUN {
-                    let mut run = (b1 & 0x3f) + 1;
-
-                    while run > 0 {
-                        run -= 1;
-                        if unlikely(px_pos >= px_len) {
-                            return Err(DecodeError::OutputIsTooSmall);
-                        }
-                        match HAS_ALPHA {
-                            true => px.write_rgba(unsafe {
-                                output.get_unchecked_mut(px_pos..px_pos + 4)
-                            }),
-                            false => px
-                                .write_rgb(unsafe { output.get_unchecked_mut(px_pos..px_pos + 3) }),
-                        }
-                        px_pos += channels;
+                    0b01000000..=0b01111111 => {
+                        px.r = px.r.wrapping_add(((b1 >> 4) & 0x03).wrapping_sub(2));
+                        px.g = px.g.wrapping_add(((b1 >> 2) & 0x03).wrapping_sub(2));
+                        px.b = px.b.wrapping_add((b1 & 0x03).wrapping_sub(2));
                     }
-                    continue;
+                    0b10000000..=0b10111111 => {
+                        let b2 = unsafe { reader.read_8() };
+
+                        let vg = (b1 & 0x3f).wrapping_sub(32);
+                        let vr = ((b2 >> 4) & 0x0f).wrapping_sub(8).wrapping_add(vg);
+                        let vb = (b2 & 0x0f).wrapping_sub(8).wrapping_add(vg);
+
+                        px.r = px.r.wrapping_add(vr);
+                        px.g = px.g.wrapping_add(vg);
+                        px.b = px.b.wrapping_add(vb);
+                    }
+                    0b11000000.. => {
+                        let mut run = (b1 & 0x3f) + 1;
+
+                        while run > 0 {
+                            run -= 1;
+                            if unlikely(px_pos >= px_len) {
+                                return Err(DecodeError::OutputIsTooSmall);
+                            }
+                            match HAS_ALPHA {
+                                true => px.write_rgba(unsafe {
+                                    output.get_unchecked_mut(px_pos..px_pos + 4)
+                                }),
+                                false => px.write_rgb(unsafe {
+                                    output.get_unchecked_mut(px_pos..px_pos + 3)
+                                }),
+                            }
+                            px_pos += channels;
+                        }
+                        continue;
+                    }
                 }
                 index[qui_color_hash(px)] = px;
             } else {
