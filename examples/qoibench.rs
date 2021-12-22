@@ -96,6 +96,9 @@ fn benchmark_image(path: &Path, runs: u32) -> BenchmarkResult {
     .encode_alloc(pixels)
     .unwrap();
 
+    let encoded_qoi =
+        qoi::QoiEncode::qoi_encode_to_vec(pixels, w, h, qoi::Channels::Four, 0).unwrap();
+
     let image_qoi_rs = qoi_rs::Image {
         pixels: pixels.clone().into_boxed_slice(),
         width: w as u16,
@@ -128,7 +131,7 @@ fn benchmark_image(path: &Path, runs: u32) -> BenchmarkResult {
     // Decoding
 
     benchmark_fn(runs, &mut res.qoi.decode_time, || {
-        qoi::QoiDecode::qoi_decode_to_vec(&encoded, Some(qoi::Channels::Four)).unwrap();
+        qoi::QoiDecode::qoi_decode_to_vec(&encoded_qoi, Some(qoi::Channels::Four)).unwrap();
     });
 
     benchmark_fn(runs, &mut res.qoi_rs.decode_time, || {

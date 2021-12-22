@@ -286,6 +286,20 @@ impl UnsafeReader {
         self.len -= 4;
         v
     }
+
+    #[inline(always)]
+    unsafe fn read_rgb(&mut self, c: &mut Rgba) {
+        copy_nonoverlapping(self.ptr, c as *mut _ as *mut u8, 3);
+        self.ptr = self.ptr.add(3);
+        self.len -= 3;
+    }
+
+    #[inline(always)]
+    unsafe fn read_rgba(&mut self, c: &mut Rgba) {
+        copy_nonoverlapping(self.ptr, c as *mut _ as *mut u8, 4);
+        self.ptr = self.ptr.add(4);
+        self.len -= 4;
+    }
 }
 
 #[repr(C)]
@@ -352,6 +366,16 @@ impl Rgba {
     #[inline(always)]
     fn write_rgb(&self, bytes: &mut [u8]) {
         bytes.copy_from_slice(&u32::to_le_bytes(unsafe { transmute(*self) })[..3])
+    }
+
+    #[inline(always)]
+    unsafe fn write_rgb_ptr(&self, dst: *mut u8) {
+        copy_nonoverlapping(self as *const _ as *const u8, dst, 3);
+    }
+
+    #[inline(always)]
+    unsafe fn write_rgba_ptr(&self, dst: *mut u8) {
+        copy_nonoverlapping(self as *const _ as *const u8, dst, 4);
     }
 
     #[inline(always)]

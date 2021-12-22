@@ -93,16 +93,11 @@ impl Qoi {
 
                 if b1 == QOI_OP_RGB {
                     unsafe {
-                        px.r = reader.read_8();
-                        px.g = reader.read_8();
-                        px.b = reader.read_8();
+                        reader.read_rgb(&mut px);
                     }
                 } else if b1 == QOI_OP_RGBA {
                     unsafe {
-                        px.r = reader.read_8();
-                        px.g = reader.read_8();
-                        px.b = reader.read_8();
-                        px.a = reader.read_8();
+                        reader.read_rgba(&mut px);
                     }
                 } else if (b1 & QOI_MASK_2) == QOI_OP_INDEX {
                     px = index[b1 as usize];
@@ -121,9 +116,10 @@ impl Qoi {
                     px.g = px.g.wrapping_add(vg);
                     px.b = px.b.wrapping_add(vb);
                 } else if (b1 & QOI_MASK_2) == QOI_OP_RUN {
-                    let run = (b1 & 0x3f) + 1;
+                    let mut run = (b1 & 0x3f) + 1;
 
-                    for _ in 0..run {
+                    while run > 0 {
+                        run -= 1;
                         if unlikely(px_pos >= px_len) {
                             return Err(DecodeError::OutputIsTooSmall);
                         }
@@ -138,8 +134,7 @@ impl Qoi {
                     }
                     continue;
                 }
-                let idx = qui_color_hash(px);
-                index[idx] = px;
+                index[qui_color_hash(px)] = px;
             } else {
                 return Err(DecodeError::DataIsTooSmall);
             }
