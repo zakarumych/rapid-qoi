@@ -5,6 +5,7 @@ use alloc::{vec, vec::Vec};
 
 impl Qoi {
     /// Returns decoded pixel data size.
+    #[inline(always)]
     pub fn decoded_size(&self) -> usize {
         self.width as usize
             * self.height as usize
@@ -56,16 +57,30 @@ impl Qoi {
     }
 
     /// Decode a QOI image from memory.
+    #[inline(always)]
     pub fn decode(bytes: &[u8], output: &mut [u8]) -> Result<Qoi, DecodeError> {
         let qoi = Self::decode_header(bytes)?;
-
         qoi.decode_skip_header(bytes, output)?;
         Ok(qoi)
     }
 
     /// Decode a QOI image from memory.
     /// Skips header parsing and uses provided header value.
+    #[inline(always)]
     pub fn decode_skip_header(&self, bytes: &[u8], output: &mut [u8]) -> Result<(), DecodeError> {
+        match self.color_space.alpha_srgb.is_some() {
+            true => self.decode_impl::<true>(bytes, output),
+            false => self.decode_impl::<false>(bytes, output),
+        }
+    }
+
+    fn decode_impl<const HAS_ALPHA: bool>(
+        &self,
+        bytes: &[u8],
+        output: &mut [u8],
+    ) -> Result<(), DecodeError> {
+        assert_eq!(HAS_ALPHA, self.color_space.alpha_srgb.is_some());
+
         let px_len = self.decoded_size();
 
         if self.width == 0 || self.height == 0 {
@@ -84,8 +99,7 @@ impl Qoi {
         let mut px = Rgba::new_opaque();
         let mut index = [Rgba::new(); 64];
 
-        let has_alpha = self.color_space.alpha_srgb.is_some();
-        let channels = has_alpha as usize + 3;
+        let channels = HAS_ALPHA as usize + 3;
 
         let mut px_pos = 0;
         while px_pos < px_len {
@@ -124,7 +138,7 @@ impl Qoi {
                         if unlikely(px_pos >= px_len) {
                             return Err(DecodeError::OutputIsTooSmall);
                         }
-                        match has_alpha {
+                        match HAS_ALPHA {
                             true => px.write_rgba(unsafe {
                                 output.get_unchecked_mut(px_pos..px_pos + 4)
                             }),
@@ -140,7 +154,7 @@ impl Qoi {
                 return Err(DecodeError::DataIsTooSmall);
             }
 
-            match has_alpha {
+            match HAS_ALPHA {
                 true => px.write_rgba(unsafe { output.get_unchecked_mut(px_pos..px_pos + 4) }),
                 false => px.write_rgb(unsafe { output.get_unchecked_mut(px_pos..px_pos + 3) }),
             }
@@ -151,6 +165,7 @@ impl Qoi {
     }
 
     #[cfg(feature = "alloc")]
+    #[inline(always)]
     pub fn decode_alloc(bytes: &[u8]) -> Result<(Self, Vec<u8>), DecodeError> {
         let qoi = Self::decode_header(bytes)?;
 
