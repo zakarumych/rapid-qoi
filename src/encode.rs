@@ -12,7 +12,7 @@ impl Qoi {
     /// is set to the size in bytes of the encoded data.
     /// The returned qoi data should be free()d after user.
     pub fn encode(&self, pixels: &[u8], output: &mut [u8]) -> Result<usize, EncodeError> {
-        let has_alpha = self.color_space.alpha_srgb.is_some();
+        let has_alpha = self.colors.has_alpha();
         let channels = has_alpha as usize + 3;
 
         let px_len = self.width as usize * self.height as usize * channels;
@@ -35,22 +35,24 @@ impl Qoi {
             writer.write_32(QOI_MAGIC);
             writer.write_32(self.width);
             writer.write_32(self.height);
-            writer.write_8(channels as u8);
-            writer.write_8(
-                match self.color_space.red_srgb {
-                    true => 0x8,
-                    false => 0,
-                } | match self.color_space.green_srgb {
-                    true => 0x4,
-                    false => 0,
-                } | match self.color_space.blue_srgb {
-                    true => 0x2,
-                    false => 0,
-                } | match self.color_space.alpha_srgb {
-                    Some(true) => 0x1,
-                    None | Some(false) => 0,
-                },
-            );
+            match self.colors {
+                Colors::Rgb => {
+                    writer.write_8(3);
+                    writer.write_8(1);
+                }
+                Colors::Rgba => {
+                    writer.write_8(4);
+                    writer.write_8(1);
+                }
+                Colors::Srgb => {
+                    writer.write_8(3);
+                    writer.write_8(0);
+                }
+                Colors::SrgbLinA => {
+                    writer.write_8(4);
+                    writer.write_8(0);
+                }
+            }
         }
 
         let mut index = [Rgba::new(); 64];
@@ -137,9 +139,7 @@ impl Qoi {
 
     /// Returns maximum size of the the `Qoi::encode` output size.
     pub fn encoded_size_limit(&self) -> usize {
-        self.width as usize
-            * self.height as usize
-            * (self.color_space.alpha_srgb.is_some() as usize + 4)
+        self.width as usize * self.height as usize * (self.colors.has_alpha() as usize + 4)
             + QOI_HEADER_SIZE
             + QOI_PADDING
     }

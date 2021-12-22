@@ -133,58 +133,6 @@ use core::{
 mod decode;
 mod encode;
 
-pub struct ColorSpace {
-    /// Red channel color space of the image.
-    pub red_srgb: bool,
-
-    /// Green channel color space of the image.
-    pub green_srgb: bool,
-
-    /// Blue channel color space of the image.
-    pub blue_srgb: bool,
-
-    /// Alpha channel color space of the image.
-    /// `None` means channel does not exists.
-    pub alpha_srgb: Option<bool>,
-}
-
-impl ColorSpace {
-    pub const SRGB: Self = ColorSpace {
-        red_srgb: true,
-        green_srgb: true,
-        blue_srgb: true,
-        alpha_srgb: None,
-    };
-
-    pub const SRGBA: Self = ColorSpace {
-        red_srgb: true,
-        green_srgb: true,
-        blue_srgb: true,
-        alpha_srgb: Some(true),
-    };
-
-    pub const SRGB_LINA: Self = ColorSpace {
-        red_srgb: true,
-        green_srgb: true,
-        blue_srgb: true,
-        alpha_srgb: Some(false),
-    };
-
-    pub const RGB: Self = ColorSpace {
-        red_srgb: false,
-        green_srgb: false,
-        blue_srgb: false,
-        alpha_srgb: None,
-    };
-
-    pub const RGBA: Self = ColorSpace {
-        red_srgb: false,
-        green_srgb: false,
-        blue_srgb: false,
-        alpha_srgb: Some(false),
-    };
-}
-
 const QOI_OP_INDEX: u8 = 0x00; /* 00xxxxxx */
 const QOI_OP_DIFF: u8 = 0x40; /* 01xxxxxx */
 const QOI_OP_LUMA: u8 = 0x80; /* 10xxxxxx */
@@ -389,6 +337,22 @@ impl Var {
     }
 }
 
+pub enum Colors {
+    Srgb,
+    SrgbLinA,
+    Rgb,
+    Rgba,
+}
+
+impl Colors {
+    pub fn has_alpha(&self) -> bool {
+        match self {
+            Colors::Rgb | Colors::Srgb => false,
+            Colors::Rgba | Colors::SrgbLinA => true,
+        }
+    }
+}
+
 /// QOI descriptor value.
 pub struct Qoi {
     /// Width of the image.
@@ -398,7 +362,7 @@ pub struct Qoi {
     pub height: u32,
 
     /// Specifies image color space.
-    pub color_space: ColorSpace,
+    pub colors: Colors,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -428,6 +392,7 @@ pub enum DecodeError {
     DataIsTooSmall,
     InvalidMagic,
     InvalidChannelsValue,
+    InvalidColorSpaceValue,
     OutputIsTooSmall,
 }
 
@@ -439,6 +404,7 @@ impl Display for DecodeError {
                 f.write_str("Encoded data does not start with 'qoif' code")
             }
             DecodeError::InvalidChannelsValue => f.write_str("Numbers of channels is not 3 or 4"),
+            DecodeError::InvalidColorSpaceValue => f.write_str("Colorspace is not 0 or 1"),
             DecodeError::OutputIsTooSmall => {
                 f.write_str("Output buffer is too small to fit decoded image")
             }

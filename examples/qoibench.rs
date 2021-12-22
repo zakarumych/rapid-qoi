@@ -62,14 +62,12 @@ struct BenchmarkResult {
 
 #[inline(never)]
 fn benchmark_fn(runs: u32, avg_time: &mut Duration, mut f: impl FnMut()) {
-    let mut time = Duration::ZERO;
-    for i in 0..=runs {
-        let time_start = ns();
+    f();
+    let time_start = ns();
+    for _ in 0..runs {
         f();
-        if i > 0 {
-            time += time_start.elapsed();
-        }
     }
+    let time = time_start.elapsed();
     *avg_time = time / runs;
 }
 
@@ -91,7 +89,7 @@ fn benchmark_image(path: &Path, runs: u32) -> BenchmarkResult {
     let encoded = rapid_qoi::Qoi {
         width: w,
         height: h,
-        color_space: rapid_qoi::ColorSpace::SRGBA,
+        colors: rapid_qoi::Colors::SrgbLinA,
     }
     .encode_alloc(pixels)
     .unwrap();
@@ -169,7 +167,7 @@ fn benchmark_image(path: &Path, runs: u32) -> BenchmarkResult {
         let q = rapid_qoi::Qoi {
             width: w,
             height: h,
-            color_space: rapid_qoi::ColorSpace::SRGBA,
+            colors: rapid_qoi::Colors::SrgbLinA,
         };
         let encoded = q.encode_alloc(pixels).unwrap();
         *size = encoded.len() as u64;

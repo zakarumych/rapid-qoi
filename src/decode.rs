@@ -7,9 +7,7 @@ impl Qoi {
     /// Returns decoded pixel data size.
     #[inline(always)]
     pub fn decoded_size(&self) -> usize {
-        self.width as usize
-            * self.height as usize
-            * (self.color_space.alpha_srgb.is_some() as usize + 3)
+        self.width as usize * self.height as usize * (self.colors.has_alpha() as usize + 3)
     }
 
     /// Decodes header from QOI
@@ -32,26 +30,18 @@ impl Qoi {
         let w = unsafe { reader.read_32() };
         let h = unsafe { reader.read_32() };
         let channels = unsafe { reader.read_8() } as usize;
-        let color_space = unsafe { reader.read_8() };
-
-        let has_alpha = match channels {
-            3 => false,
-            4 => true,
-            _ => return Err(DecodeError::InvalidChannelsValue),
-        };
+        let all_linear = unsafe { reader.read_8() };
 
         Ok(Qoi {
             width: w,
             height: h,
-            color_space: ColorSpace {
-                red_srgb: (color_space & 0x8) != 0,
-                green_srgb: (color_space & 0x4) != 0,
-                blue_srgb: (color_space & 0x2) != 0,
-                alpha_srgb: if has_alpha {
-                    Some((color_space & 0x1) != 0)
-                } else {
-                    None
-                },
+            colors: match (channels, all_linear) {
+                (3, 0) => Colors::Srgb,
+                (4, 0) => Colors::SrgbLinA,
+                (3, 1) => Colors::Rgb,
+                (4, 1) => Colors::Rgba,
+                (_, 0 | 1) => return Err(DecodeError::InvalidChannelsValue),
+                (_, _) => return Err(DecodeError::InvalidColorSpaceValue),
             },
         })
     }
@@ -68,7 +58,7 @@ impl Qoi {
     /// Skips header parsing and uses provided header value.
     #[inline(always)]
     pub fn decode_skip_header(&self, bytes: &[u8], output: &mut [u8]) -> Result<(), DecodeError> {
-        match self.color_space.alpha_srgb.is_some() {
+        match self.colors.has_alpha() {
             true => self.decode_impl::<true>(bytes, output),
             false => self.decode_impl::<false>(bytes, output),
         }
@@ -79,7 +69,7 @@ impl Qoi {
         bytes: &[u8],
         output: &mut [u8],
     ) -> Result<(), DecodeError> {
-        assert_eq!(HAS_ALPHA, self.color_space.alpha_srgb.is_some());
+        assert_eq!(HAS_ALPHA, self.colors.has_alpha());
 
         let px_len = self.decoded_size();
 
@@ -165,7 +155,7 @@ impl Qoi {
             px_pos += channels;
         }
 
-        Ok(())
+        return Ok(());
     }
 
     #[cfg(feature = "alloc")]

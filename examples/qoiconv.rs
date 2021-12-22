@@ -55,7 +55,7 @@ fn main() -> Result<(), ()> {
             }
         };
 
-        match qoi.color_space.alpha_srgb.is_some() {
+        match qoi.colors.has_alpha() {
             true => image::save_buffer_with_format(
                 &output,
                 &pixels,
@@ -105,7 +105,7 @@ fn main() -> Result<(), ()> {
                 let qoi = rapid_qoi::Qoi {
                     width: rgba.width(),
                     height: rgba.height(),
-                    color_space: rapid_qoi::ColorSpace::SRGBA,
+                    colors: rapid_qoi::Colors::SrgbLinA,
                 };
 
                 let bytes = qoi.encode_alloc(pixels).map_err(|err| {
@@ -131,7 +131,7 @@ fn main() -> Result<(), ()> {
                 let qoi = rapid_qoi::Qoi {
                     width: rgb.width(),
                     height: rgb.height(),
-                    color_space: rapid_qoi::ColorSpace::SRGB,
+                    colors: rapid_qoi::Colors::Srgb,
                 };
 
                 let bytes = qoi.encode_alloc(pixels).map_err(|err| {
