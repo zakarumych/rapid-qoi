@@ -127,7 +127,7 @@ extern crate alloc;
 use core::{
     fmt::{self, Display},
     mem::transmute,
-    ptr::{copy_nonoverlapping, write_bytes},
+    ptr::copy_nonoverlapping,
 };
 
 mod decode;
@@ -205,7 +205,6 @@ const fn qui_color_hash(c: Rgba) -> usize {
 const QOI_MAGIC: u32 = u32::from_be_bytes(*b"qoif");
 const QOI_HEADER_SIZE: usize = 14;
 const QOI_PADDING: usize = 8;
-const QOI_PIXELS_MAX: usize = 400000000;
 
 struct UnsafeWriter {
     ptr: *mut u8,
@@ -213,13 +212,6 @@ struct UnsafeWriter {
 }
 
 impl UnsafeWriter {
-    #[inline(always)]
-    unsafe fn fill(&mut self, v: u8, count: usize) {
-        write_bytes(self.ptr, v, count);
-        self.ptr = self.ptr.add(count);
-        self.len -= count;
-    }
-
     #[inline(always)]
     unsafe fn pad(&mut self) {
         copy_nonoverlapping([0, 0, 0, 0, 0, 0, 0, 1].as_ptr(), self.ptr, 8);
@@ -247,14 +239,6 @@ impl UnsafeWriter {
         self.ptr = self.ptr.add(4);
         self.len -= 4;
     }
-
-    #[inline(always)]
-    unsafe fn skip_8(&mut self) -> *mut u8 {
-        let ptr = self.ptr;
-        self.ptr = self.ptr.add(1);
-        self.len -= 1;
-        ptr
-    }
 }
 
 struct UnsafeReader {
@@ -268,14 +252,6 @@ impl UnsafeReader {
         let v = *self.ptr;
         self.ptr = self.ptr.add(1);
         self.len -= 1;
-        v
-    }
-
-    #[inline(always)]
-    unsafe fn read_16(&mut self) -> u16 {
-        let v = u16::from_be_bytes(*(self.ptr as *const [u8; 2]));
-        self.ptr = self.ptr.add(2);
-        self.len -= 2;
         v
     }
 
@@ -352,9 +328,9 @@ impl Rgba {
     }
 
     #[inline(always)]
-    fn read_rgb(bytes: &[u8]) -> Self {
-        let mut v = [255; 4];
-        v.copy_from_slice(&bytes[..3]);
+    fn read_rgb(bytes: &[u8], a: u8) -> Self {
+        let mut v = [0, 0, 0, a];
+        v[..3].copy_from_slice(&bytes[..3]);
         unsafe { transmute(v) }
     }
 
@@ -369,23 +345,12 @@ impl Rgba {
     }
 
     #[inline(always)]
-    unsafe fn write_rgb_ptr(&self, dst: *mut u8) {
-        copy_nonoverlapping(self as *const _ as *const u8, dst, 3);
-    }
-
-    #[inline(always)]
-    unsafe fn write_rgba_ptr(&self, dst: *mut u8) {
-        copy_nonoverlapping(self as *const _ as *const u8, dst, 4);
-    }
-
-    #[inline(always)]
     fn var(&self, prev: &Self) -> Var {
         debug_assert_eq!(self.a, prev.a);
 
         let r = self.r.wrapping_sub(prev.r);
         let g = self.g.wrapping_sub(prev.g);
         let b = self.b.wrapping_sub(prev.b);
-        let a = self.a.wrapping_sub(prev.a);
 
         Var { r, g, b }
     }

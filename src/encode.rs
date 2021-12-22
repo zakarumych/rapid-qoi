@@ -68,7 +68,7 @@ impl Qoi {
 
             match has_alpha {
                 true => px = Rgba::read_rgba(pixel),
-                false => px = Rgba::read_rgb(pixel),
+                false => px = Rgba::read_rgb(pixel, 255),
             }
 
             if px == px_prev {

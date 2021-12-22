@@ -58,6 +58,7 @@ impl Qoi {
     /// Decode a QOI image from memory.
     pub fn decode(bytes: &[u8], output: &mut [u8]) -> Result<Qoi, DecodeError> {
         let qoi = Self::decode_header(bytes)?;
+
         qoi.decode_skip_header(bytes, output)?;
         Ok(qoi)
     }
@@ -65,11 +66,6 @@ impl Qoi {
     /// Decode a QOI image from memory.
     /// Skips header parsing and uses provided header value.
     pub fn decode_skip_header(&self, bytes: &[u8], output: &mut [u8]) -> Result<(), DecodeError> {
-        let mut reader = UnsafeReader {
-            ptr: bytes[QOI_HEADER_SIZE..].as_ptr(),
-            len: bytes[QOI_HEADER_SIZE..].len(),
-        };
-
         let px_len = self.decoded_size();
 
         if self.width == 0 || self.height == 0 {
@@ -79,6 +75,11 @@ impl Qoi {
         if px_len > output.len() {
             return Err(DecodeError::OutputIsTooSmall);
         }
+
+        let mut reader = UnsafeReader {
+            ptr: bytes[QOI_HEADER_SIZE..].as_ptr(),
+            len: bytes[QOI_HEADER_SIZE..].len(),
+        };
 
         let mut px = Rgba::new_opaque();
         let mut index = [Rgba::new(); 64];
