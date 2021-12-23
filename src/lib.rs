@@ -24,7 +24,7 @@
 //! ```
 //! Images are encoded from top to bottom, left to right. The decoder and encoder
 //! start with `{r: 0, g: 0, b: 0, a: 255}` as the previous pixel value. An image is
-//! complete when all pixels specified by width * height have been covered.
+//! complete when all pixels specified by width * height have been covered.\
 //! Pixels are encoded as
 //!  * a run of the previous pixel
 //!  * an index into an array of previously seen pixels
@@ -46,7 +46,7 @@
 //! ```
 //! Each chunk starts with a 2- or 8-bit tag, followed by a number of data bits. The
 //! bit length of chunks is divisible by 8 - i.e. all chunks are byte aligned. All
-//! values encoded in these data bits have the most significant bit on the left.
+//! values encoded in these data bits have the most significant bit on the left.\
 //! The 8-bit tags have precedence over the 2-bit tags. A decoder must check for the
 //! presence of an 8-bit tag first.
 //!
@@ -113,8 +113,8 @@
 //! |  1  1 |       run       |
 //! `-------------------------`
 //! ```
-//! 2-bit tag `0b11`
-//! 6-bit run-length repeating the previous pixel: `1..=62`
+//! 2-bit tag `0b11`\
+//! 6-bit run-length repeating the previous pixel: `1..=62`\
 //! The run-length is stored with a bias of -1. Note that the run-lengths 63 and 64
 //! (`0b111110` and `0b111111`) are illegal as they are occupied by the `QOI_OP_RGB` and
 //! `QOI_OP_RGBA` tags.
@@ -126,10 +126,10 @@
 //! |  1  1  1  1  1  1  1  0 |   red   |  green  |  blue   |
 //! `-------------------------------------------------------`
 //! ```
-//! 8-bit tag `0b11111110`
-//! 8-bit   red channel value
-//! 8-bit green channel value
-//! 8-bit  blue channel value
+//! 8-bit tag `0b11111110`\
+//! 8-bit   red channel value\
+//! 8-bit green channel value\
+//! 8-bit  blue channel value\
 //! The alpha value remains unchanged from the previous pixel.
 //! ```text
 //! .- QOI_OP_RGBA ---------------------------------------------------.
@@ -139,20 +139,18 @@
 //! |  1  1  1  1  1  1  1  1 |   red   |  green  |  blue   |  alpha  |
 //! `-----------------------------------------------------------------`
 //! ```
-//! 8-bit tag `0b11111111`
-//! 8-bit   red channel value
-//! 8-bit green channel value
-//! 8-bit  blue channel value
+//! 8-bit tag `0b11111111`\
+//! 8-bit   red channel value\
+//! 8-bit green channel value\
+//! 8-bit  blue channel value\
 //! 8-bit alpha channel value
+#![forbid(unsafe_code)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
-use core::{
-    fmt::{self, Display},
-    mem::transmute,
-};
+use core::fmt::{self, Display};
 
 mod decode;
 mod encode;
@@ -164,93 +162,220 @@ const QOI_OP_RUN: u8 = 0xc0; /* 11xxxxxx */
 const QOI_OP_RGB: u8 = 0xfe; /* 11111110 */
 const QOI_OP_RGBA: u8 = 0xff; /* 11111111 */
 
-#[inline(always)]
-const fn qui_color_hash(c: Rgba) -> usize {
-    (c.r.wrapping_mul(3)
-        .wrapping_add(c.g.wrapping_mul(5))
-        .wrapping_add(c.b.wrapping_mul(7).wrapping_add(c.a.wrapping_mul(11)))
-        & 63) as usize
-}
-
 const QOI_MAGIC: u32 = u32::from_be_bytes(*b"qoif");
 const QOI_HEADER_SIZE: usize = 14;
 const QOI_PADDING: usize = 8;
 
-#[repr(C)]
-#[derive(Clone, Copy, Eq)]
-struct Rgba {
-    r: u8,
-    g: u8,
-    b: u8,
-    a: u8,
+trait Pixel: Copy + Eq {
+    const HAS_ALPHA: bool;
+    const CHANNELS: usize;
+
+    fn new() -> Self;
+
+    fn new_opaque() -> Self;
+
+    fn read(&mut self, bytes: &[u8]);
+
+    fn write(&self, bytes: &mut [u8]);
+
+    fn var(&self, prev: &Self) -> Var;
+
+    fn r(&self) -> u8;
+
+    fn g(&self) -> u8;
+
+    fn b(&self) -> u8;
+
+    fn a(&self) -> u8;
+
+    fn set_r(&mut self, r: u8);
+
+    fn set_g(&mut self, g: u8);
+
+    fn set_b(&mut self, b: u8);
+
+    fn set_a(&mut self, a: u8);
+
+    fn hash(&self) -> u8;
 }
 
-impl PartialEq for Rgba {
-    #[inline(always)]
-    fn eq(&self, other: &Self) -> bool {
-        self.u32() == other.u32()
-    }
+#[repr(transparent)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct Rgb {
+    rgb: [u8; 3],
 }
 
-impl Rgba {
+impl Pixel for Rgb {
+    const HAS_ALPHA: bool = false;
+    const CHANNELS: usize = 3;
+
     #[inline(always)]
-    const fn u32(&self) -> u32 {
-        unsafe { transmute(*self) }
+    fn new() -> Self {
+        Rgb { rgb: [0; 3] }
     }
 
     #[inline(always)]
-    const fn new() -> Self {
-        Rgba {
-            r: 0,
-            g: 0,
-            b: 0,
-            a: 0,
-        }
+    fn new_opaque() -> Self {
+        Rgb { rgb: [0; 3] }
     }
 
     #[inline(always)]
-    const fn new_opaque() -> Self {
-        Rgba {
-            r: 0,
-            g: 0,
-            b: 0,
-            a: 255,
-        }
+    fn read(&mut self, bytes: &[u8]) {
+        self.rgb.copy_from_slice(bytes);
     }
 
     #[inline(always)]
-    fn read_rgba(bytes: &[u8]) -> Self {
-        let mut v = [0; 4];
-        v.copy_from_slice(&bytes[..4]);
-        unsafe { transmute(v) }
-    }
-
-    #[inline(always)]
-    fn read_rgb(bytes: &[u8], a: u8) -> Self {
-        let mut v = [0, 0, 0, a];
-        v[..3].copy_from_slice(&bytes[..3]);
-        unsafe { transmute(v) }
-    }
-
-    #[inline(always)]
-    fn write_rgba(&self, bytes: &mut [u8]) {
-        bytes.copy_from_slice(&u32::to_le_bytes(unsafe { transmute(*self) }))
-    }
-
-    #[inline(always)]
-    fn write_rgb(&self, bytes: &mut [u8]) {
-        bytes.copy_from_slice(&u32::to_le_bytes(unsafe { transmute(*self) })[..3])
+    fn write(&self, bytes: &mut [u8]) {
+        bytes.copy_from_slice(&self.rgb)
     }
 
     #[inline(always)]
     fn var(&self, prev: &Self) -> Var {
-        debug_assert_eq!(self.a, prev.a);
-
-        let r = self.r.wrapping_sub(prev.r);
-        let g = self.g.wrapping_sub(prev.g);
-        let b = self.b.wrapping_sub(prev.b);
+        let r = self.r().wrapping_sub(prev.r());
+        let g = self.g().wrapping_sub(prev.g());
+        let b = self.b().wrapping_sub(prev.b());
 
         Var { r, g, b }
+    }
+
+    #[inline(always)]
+    fn r(&self) -> u8 {
+        self.rgb[0]
+    }
+
+    #[inline(always)]
+    fn g(&self) -> u8 {
+        self.rgb[1]
+    }
+
+    #[inline(always)]
+    fn b(&self) -> u8 {
+        self.rgb[2]
+    }
+
+    #[inline(always)]
+    fn a(&self) -> u8 {
+        255
+    }
+
+    #[inline(always)]
+    fn set_r(&mut self, r: u8) {
+        self.rgb[0] = r;
+    }
+
+    #[inline(always)]
+    fn set_g(&mut self, g: u8) {
+        self.rgb[1] = g;
+    }
+
+    #[inline(always)]
+    fn set_b(&mut self, b: u8) {
+        self.rgb[2] = b;
+    }
+
+    #[inline(always)]
+    fn set_a(&mut self, a: u8) {
+        debug_assert_eq!(a, 255);
+    }
+
+    #[inline(always)]
+    fn hash(&self) -> u8 {
+        let [r, g, b] = self.rgb;
+        r.wrapping_mul(3)
+            .wrapping_add(g.wrapping_mul(5))
+            .wrapping_add(b.wrapping_mul(7).wrapping_add(245))
+            & 63
+    }
+}
+
+#[repr(transparent)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct Rgba {
+    rgba: [u8; 4],
+}
+
+impl Pixel for Rgba {
+    const HAS_ALPHA: bool = true;
+    const CHANNELS: usize = 4;
+
+    #[inline(always)]
+    fn new() -> Self {
+        Rgba { rgba: [0; 4] }
+    }
+
+    #[inline(always)]
+    fn new_opaque() -> Self {
+        Rgba { rgba: [0, 0, 0, 1] }
+    }
+
+    #[inline(always)]
+    fn read(&mut self, bytes: &[u8]) {
+        self.rgba.copy_from_slice(bytes);
+    }
+
+    #[inline(always)]
+    fn write(&self, bytes: &mut [u8]) {
+        bytes.copy_from_slice(&self.rgba)
+    }
+
+    #[inline(always)]
+    fn var(&self, prev: &Self) -> Var {
+        debug_assert_eq!(self.a(), prev.a());
+
+        let r = self.r().wrapping_sub(prev.r());
+        let g = self.g().wrapping_sub(prev.g());
+        let b = self.b().wrapping_sub(prev.b());
+
+        Var { r, g, b }
+    }
+
+    #[inline(always)]
+    fn r(&self) -> u8 {
+        self.rgba[0]
+    }
+
+    #[inline(always)]
+    fn g(&self) -> u8 {
+        self.rgba[1]
+    }
+
+    #[inline(always)]
+    fn b(&self) -> u8 {
+        self.rgba[2]
+    }
+
+    #[inline(always)]
+    fn a(&self) -> u8 {
+        self.rgba[3]
+    }
+
+    #[inline(always)]
+    fn set_r(&mut self, r: u8) {
+        self.rgba[0] = r;
+    }
+
+    #[inline(always)]
+    fn set_g(&mut self, g: u8) {
+        self.rgba[1] = g;
+    }
+
+    #[inline(always)]
+    fn set_b(&mut self, b: u8) {
+        self.rgba[2] = b;
+    }
+
+    #[inline(always)]
+    fn set_a(&mut self, a: u8) {
+        self.rgba[3] = a;
+    }
+
+    #[inline(always)]
+    fn hash(&self) -> u8 {
+        let [r, g, b, a] = self.rgba;
+        r.wrapping_mul(3)
+            .wrapping_add(g.wrapping_mul(5))
+            .wrapping_add(b.wrapping_mul(7).wrapping_add(a.wrapping_mul(11)))
+            & 63
     }
 }
 
@@ -409,14 +534,6 @@ fn cold() {}
 #[inline(always)]
 fn likely(b: bool) -> bool {
     if !b {
-        cold();
-    }
-    b
-}
-
-#[inline(always)]
-fn unlikely(b: bool) -> bool {
-    if b {
         cold();
     }
     b

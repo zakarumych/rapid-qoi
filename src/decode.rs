@@ -1,4 +1,4 @@
-use core::{convert::TryInto, hint::unreachable_unchecked};
+use core::convert::TryInto;
 
 use super::*;
 
@@ -65,17 +65,16 @@ impl Qoi {
     #[inline(always)]
     pub fn decode_skip_header(&self, bytes: &[u8], output: &mut [u8]) -> Result<(), DecodeError> {
         match self.colors.has_alpha() {
-            true => self.decode_impl::<true>(bytes, output),
-            false => self.decode_impl::<false>(bytes, output),
+            true => self.decode_impl::<Rgba>(bytes, output),
+            false => self.decode_impl::<Rgb>(bytes, output),
         }
     }
 
-    fn decode_impl<const HAS_ALPHA: bool>(
-        &self,
-        bytes: &[u8],
-        output: &mut [u8],
-    ) -> Result<(), DecodeError> {
-        debug_assert_eq!(HAS_ALPHA, self.colors.has_alpha());
+    fn decode_impl<P>(&self, bytes: &[u8], output: &mut [u8]) -> Result<(), DecodeError>
+    where
+        P: Pixel,
+    {
+        debug_assert_eq!(self.colors.has_alpha(), P::HAS_ALPHA);
 
         let px_len = self.decoded_size();
 
@@ -87,87 +86,88 @@ impl Qoi {
             return Err(DecodeError::OutputIsTooSmall);
         }
 
-        let mut px = Rgba::new_opaque();
-        let mut index = [Rgba::new(); 64];
-
-        let channels = HAS_ALPHA as usize + 3;
-
-        let mut px_pos = 0;
-
-        debug_assert_eq!(px_len % channels, 0);
+        let mut px = P::new_opaque();
+        let mut index = [P::new(); 64];
 
         let mut rest = &bytes[QOI_HEADER_SIZE..];
+        let mut chunks = output[..px_len].chunks_exact_mut(P::CHANNELS);
 
-        while px_pos < px_len {
-            if likely(rest.len() > QOI_PADDING) {
-                match rest {
-                    [0b11111110, b2, b3, b4, tail @ ..] => {
-                        rest = tail;
-                        px.r = *b2;
-                        px.g = *b3;
-                        px.b = *b4;
-                    }
-                    [0b11111111, b2, b3, b4, b5, tail @ ..] => {
-                        rest = tail;
-                        px.r = *b2;
-                        px.g = *b3;
-                        px.b = *b4;
-                        px.a = *b5;
-                    }
-                    [b1 @ 0b00000000..=0b00111111, tail @ ..] => {
-                        rest = tail;
-                        px = index[*b1 as usize];
-                    }
-                    [b1 @ 0b01000000..=0b01111111, tail @ ..] => {
-                        rest = tail;
-                        px.r = px.r.wrapping_add(((b1 >> 4) & 0x03).wrapping_sub(2));
-                        px.g = px.g.wrapping_add(((b1 >> 2) & 0x03).wrapping_sub(2));
-                        px.b = px.b.wrapping_add((b1 & 0x03).wrapping_sub(2));
-                    }
-                    [b1 @ 0b10000000..=0b10111111, b2, tail @ ..] => {
-                        rest = tail;
-                        let vg = (b1 & 0x3f).wrapping_sub(32);
-                        let vr = ((b2 >> 4) & 0x0f).wrapping_sub(8).wrapping_add(vg);
-                        let vb = (b2 & 0x0f).wrapping_sub(8).wrapping_add(vg);
-
-                        px.r = px.r.wrapping_add(vr);
-                        px.g = px.g.wrapping_add(vg);
-                        px.b = px.b.wrapping_add(vb);
-                    }
-                    [b1 @ 0b11000000..=0b11111111, tail @ ..] => {
-                        rest = tail;
-                        let mut run = (b1 & 0x3f) + 1;
-
-                        while run > 0 {
-                            run -= 1;
-                            if unlikely(px_pos >= px_len) {
-                                return Err(DecodeError::OutputIsTooSmall);
-                            }
-                            match HAS_ALPHA {
-                                true => px.write_rgba(unsafe {
-                                    output.get_unchecked_mut(px_pos..px_pos + 4)
-                                }),
-                                false => px.write_rgb(unsafe {
-                                    output.get_unchecked_mut(px_pos..px_pos + 3)
-                                }),
-                            }
-                            px_pos += channels;
-                        }
-                        continue;
-                    }
-                    _ => unsafe { unreachable_unchecked() },
+        loop {
+            match chunks.next() {
+                None => {
+                    cold();
+                    break;
                 }
-            } else {
-                return Err(DecodeError::DataIsTooSmall);
-            }
+                Some(chunk) => {
+                    if likely(rest.len() & !7 != 0) {
+                        match rest {
+                            [0b11111110, b2, b3, b4, tail @ ..] => {
+                                rest = tail;
+                                px.set_r(*b2);
+                                px.set_g(*b3);
+                                px.set_b(*b4);
+                            }
+                            [0b11111111, b2, b3, b4, _, tail @ ..] if !P::HAS_ALPHA => {
+                                cold();
+                                rest = tail;
+                                px.set_r(*b2);
+                                px.set_g(*b3);
+                                px.set_b(*b4);
+                            }
+                            [0b11111111, b2, b3, b4, b5, tail @ ..] => {
+                                rest = tail;
+                                px.set_r(*b2);
+                                px.set_g(*b3);
+                                px.set_b(*b4);
+                                px.set_a(*b5);
+                            }
+                            [b1 @ 0b00000000..=0b00111111, tail @ ..] => {
+                                rest = tail;
+                                px = index[*b1 as usize];
+                                px.write(chunk);
 
-            index[qui_color_hash(px)] = px;
+                                continue;
+                            }
+                            [b1 @ 0b01000000..=0b01111111, tail @ ..] => {
+                                rest = tail;
+                                px.set_r(px.r().wrapping_add(((b1 >> 4) & 0x03).wrapping_sub(2)));
+                                px.set_g(px.g().wrapping_add(((b1 >> 2) & 0x03).wrapping_sub(2)));
+                                px.set_b(px.b().wrapping_add((b1 & 0x03).wrapping_sub(2)));
+                            }
+                            [b1 @ 0b10000000..=0b10111111, b2, tail @ ..] => {
+                                rest = tail;
+                                let vg = (b1 & 0x3f).wrapping_sub(32);
+                                let vr = ((b2 >> 4) & 0x0f).wrapping_sub(8).wrapping_add(vg);
+                                let vb = (b2 & 0x0f).wrapping_sub(8).wrapping_add(vg);
 
-            match HAS_ALPHA {
-                true => px.write_rgba(unsafe { output.get_unchecked_mut(px_pos..px_pos + 4) }),
-                false => px.write_rgb(unsafe { output.get_unchecked_mut(px_pos..px_pos + 3) }),
+                                px.set_r(px.r().wrapping_add(vr));
+                                px.set_g(px.g().wrapping_add(vg));
+                                px.set_b(px.b().wrapping_add(vb));
+                            }
+                            [b1 @ 0b11000000..=0b11111111, tail @ ..] => {
+                                rest = tail;
+                                let run = (b1 & 0x3f) as usize;
+                                likely(chunks.len() >= run);
+
+                                px.write(chunk);
+                                chunks.by_ref().take(run).for_each(|chunk| px.write(chunk));
+
+                                continue;
+                            }
+                            _ => {
+                                cold();
+                                unreachable!()
+                            }
+                        }
+                    } else {
+                        return Err(DecodeError::DataIsTooSmall);
+                    }
+
+                    index[px.hash() as usize] = px;
+
+                    px.write(chunk);
+                }
             }
-            px_pos += channels;
         }
 
         Ok(())
