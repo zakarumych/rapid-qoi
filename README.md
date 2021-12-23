@@ -6,9 +6,16 @@
 [![MIT/Apache](https://img.shields.io/badge/license-MIT%2FApache-blue.svg?style=for-the-badge)](COPYING)
 ![loc](https://img.shields.io/tokei/lines/github/zakarumych/rapid-qoi?style=for-the-badge)
 
-
 Fast implementation of QOI format.
 Reference implementation is here 'https://github.com/phoboslab/qoi'
+
+`rapid-qoi` is
+* no deps
+* no std
+* no unsafe
+* tiny
+* fast to build (0.8 sec clean build on i9)
+* one of the most efficient implementations of QOI encoder and decoder
 
 ## License
 
