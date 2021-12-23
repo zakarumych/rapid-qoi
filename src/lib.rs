@@ -41,7 +41,7 @@
 //! current pixel, this index position is written to the stream as QOI_OP_INDEX.
 //!
 //! The hash function for the index is:
-//! ```rust
+//! ```rust,ignore
 //! index_position = (r * 3 + g * 5 + b * 7 + a * 11) % 64
 //! ```
 //! Each chunk starts with a 2- or 8-bit tag, followed by a number of data bits. The
@@ -96,7 +96,7 @@
 //! The green channel is used to indicate the general direction of change and is
 //! encoded in 6 bits. The red and blue channels (dr and db) base their diffs off
 //! of the green channel difference and are encoded in 4 bits. I.e.:
-//! ```rust
+//! ```rust,ignore
 //! dr_dg = (last_px.r - cur_px.r) - (last_px.g - cur_px.g)
 //! db_dg = (last_px.b - cur_px.b) - (last_px.g - cur_px.g)
 //! ```
