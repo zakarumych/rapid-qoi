@@ -82,15 +82,16 @@ impl Qoi {
             return Ok(());
         }
 
-        if px_len > output.len() {
-            return Err(DecodeError::OutputIsTooSmall);
-        }
+        let output = match output.get_mut(..px_len) {
+            None => return Err(DecodeError::OutputIsTooSmall),
+            Some(output) => output,
+        };
 
         let mut px = P::new_opaque();
         let mut index = [P::new(); 64];
 
         let mut rest = &bytes[QOI_HEADER_SIZE..];
-        let mut chunks = output[..px_len].chunks_exact_mut(P::CHANNELS);
+        let mut chunks = output.chunks_exact_mut(P::CHANNELS);
 
         loop {
             match chunks.next() {
