@@ -1,16 +1,16 @@
+use core::hint::unreachable_unchecked;
+
 use super::*;
 
 #[cfg(feature = "alloc")]
 use alloc::{vec, vec::Vec};
 
 impl Qoi {
-    /// Encode raw RGB or RGBA pixels into a QOI image in memory. w and h denote the
-    /// width and height of the pixel data. channels must be either 3 for RGB data
-    /// or 4 for RGBA.
-    /// The function either returns NULL on failure (invalid parameters or malloc
-    /// failed) or a pointer to the encoded data on success. On success the out_len
-    /// is set to the size in bytes of the encoded data.
-    /// The returned qoi data should be free()d after user.
+    /// Encode raw RGB or RGBA pixels into a QOI image in memory.\
+    /// Encoded image is written into `output` slice.
+    ///
+    /// On success this function returns `Ok(())`.\
+    /// On failure this function returns `Err(err)` with `err` describing cause of the error.
     pub fn encode(&self, pixels: &[u8], output: &mut [u8]) -> Result<usize, EncodeError> {
         let has_alpha = self.colors.has_alpha();
         let channels = has_alpha as usize + 3;
@@ -22,36 +22,30 @@ impl Qoi {
             Some(pixels) => pixels,
         };
 
-        let mut writer = UnsafeWriter {
-            ptr: output.as_mut_ptr(),
-            len: output.len(),
-        };
-
-        if writer.len <= QOI_HEADER_SIZE {
+        if output.len() <= QOI_HEADER_SIZE {
             return Err(EncodeError::OutputIsTooSmall);
         }
 
-        unsafe {
-            writer.write_32(QOI_MAGIC);
-            writer.write_32(self.width);
-            writer.write_32(self.height);
-            match self.colors {
-                Colors::Rgb => {
-                    writer.write_8(3);
-                    writer.write_8(1);
-                }
-                Colors::Rgba => {
-                    writer.write_8(4);
-                    writer.write_8(1);
-                }
-                Colors::Srgb => {
-                    writer.write_8(3);
-                    writer.write_8(0);
-                }
-                Colors::SrgbLinA => {
-                    writer.write_8(4);
-                    writer.write_8(0);
-                }
+        output[0..4].copy_from_slice(&QOI_MAGIC.to_be_bytes());
+        output[4..8].copy_from_slice(&self.width.to_be_bytes());
+        output[8..12].copy_from_slice(&self.height.to_be_bytes());
+
+        match self.colors {
+            Colors::Rgb => {
+                output[12] = 3;
+                output[13] = 1;
+            }
+            Colors::Rgba => {
+                output[12] = 4;
+                output[13] = 1;
+            }
+            Colors::Srgb => {
+                output[12] = 3;
+                output[13] = 0;
+            }
+            Colors::SrgbLinA => {
+                output[12] = 4;
+                output[13] = 0;
             }
         }
 
@@ -63,87 +57,102 @@ impl Qoi {
 
         let mut chunks = pixels.chunks_exact(channels);
 
+        let mut rest = &mut output[QOI_HEADER_SIZE..];
+
         while let Some(pixel) = chunks.next() {
-            if unlikely(writer.len <= QOI_PADDING) {
-                return Err(EncodeError::OutputIsTooSmall);
-            }
-
-            match has_alpha {
-                true => px = Rgba::read_rgba(pixel),
-                false => px = Rgba::read_rgb(pixel, 255),
-            }
-
-            if px == px_prev {
-                run += 1;
-
-                if run == 62 || chunks.len() == 0 {
-                    unsafe { writer.write_8(QOI_OP_RUN | (run - 1) as u8) }
-                    run = 0;
-                }
-            } else {
-                if run > 0 {
-                    unsafe { writer.write_8(QOI_OP_RUN | (run - 1) as u8) }
-                    run = 0;
+            if likely(rest.len() > QOI_PADDING) {
+                match has_alpha {
+                    true => px = Rgba::read_rgba(pixel),
+                    false => px = Rgba::read_rgb(pixel, 255),
                 }
 
-                let index_pos = qui_color_hash(px);
+                if px == px_prev {
+                    run += 1;
 
-                if index[index_pos] == px {
-                    unsafe { writer.write_8(QOI_OP_INDEX | index_pos as u8) }
+                    if run == 62 || chunks.len() == 0 {
+                        rest[0] = QOI_OP_RUN | (run - 1) as u8;
+                        rest = &mut rest[1..];
+                        run = 0;
+                    }
                 } else {
-                    index[index_pos] = px;
+                    if run > 0 {
+                        rest[0] = QOI_OP_RUN | (run - 1) as u8;
+                        rest = &mut rest[1..];
+                        run = 0;
+                    }
 
-                    if px_prev.a == px.a {
-                        let v = px.var(&px_prev);
+                    match rest {
+                        [b1, b2, b3, b4, b5, ..] => {
+                            let index_pos = qui_color_hash(px);
 
-                        if let Some(diff) = v.diff() {
-                            unsafe {
-                                writer.write_8(diff);
+                            if index[index_pos] == px {
+                                *b1 = QOI_OP_INDEX | index_pos as u8;
+                                rest = &mut rest[1..];
+                            } else {
+                                index[index_pos] = px;
+
+                                if px_prev.a == px.a {
+                                    let v = px.var(&px_prev);
+
+                                    if let Some(diff) = v.diff() {
+                                        *b1 = diff;
+                                        rest = &mut rest[1..];
+                                    } else if let Some([lu, ma]) = v.luma() {
+                                        *b1 = lu;
+                                        *b2 = ma;
+                                        rest = &mut rest[2..];
+                                    } else {
+                                        *b1 = QOI_OP_RGB;
+                                        *b2 = px.r;
+                                        *b3 = px.g;
+                                        *b4 = px.b;
+                                        rest = &mut rest[4..];
+                                    }
+                                } else {
+                                    *b1 = QOI_OP_RGBA;
+                                    *b2 = px.r;
+                                    *b3 = px.g;
+                                    *b4 = px.b;
+                                    *b5 = px.a;
+                                    rest = &mut rest[5..];
+                                }
                             }
-                        } else if let Some(luma) = v.luma() {
-                            unsafe {
-                                writer.write_16(luma);
-                            }
-                        } else {
-                            unsafe {
-                                writer.write_8(QOI_OP_RGB);
-                                writer.write_8(px.r);
-                                writer.write_8(px.g);
-                                writer.write_8(px.b);
-                            }
+                            px_prev = px;
                         }
-                    } else {
-                        unsafe {
-                            writer.write_8(QOI_OP_RGBA);
-                            writer.write_8(px.r);
-                            writer.write_8(px.g);
-                            writer.write_8(px.b);
-                            writer.write_8(px.a);
-                        }
+                        _ => unsafe { unreachable_unchecked() },
                     }
                 }
-                px_prev = px;
+            } else {
+                return Err(EncodeError::OutputIsTooSmall);
             }
         }
 
-        if writer.len < QOI_PADDING {
+        if rest.len() < QOI_PADDING {
             return Err(EncodeError::OutputIsTooSmall);
         }
 
-        unsafe { writer.pad() };
+        rest[..7].fill(0);
+        rest[7] = 1;
 
-        let size = output.len() - writer.len;
+        let tail = rest.len() - QOI_PADDING;
+        let size = output.len() - tail;
 
         Ok(size)
     }
 
-    /// Returns maximum size of the the `Qoi::encode` output size.
+    /// Returns maximum size of the `Qoi::encode` output size.\
+    /// Using smaller slice may cause `Qoi::encode` to return `Err(EncodeError::OutputIsTooSmall)`.
     pub fn encoded_size_limit(&self) -> usize {
         self.width as usize * self.height as usize * (self.colors.has_alpha() as usize + 4)
             + QOI_HEADER_SIZE
             + QOI_PADDING
     }
 
+    /// Encode raw RGB or RGBA pixels into a QOI image in memory.\
+    /// Encoded image is written into allocated `Vec`.
+    ///
+    /// On success this function returns `Ok(vec)` with `vec` containing encoded image.\
+    /// On failure this function returns `Err(err)` with `err` describing cause of the error.
     #[cfg(feature = "alloc")]
     pub fn encode_alloc(&self, pixels: &[u8]) -> Result<Vec<u8>, EncodeError> {
         let limit = self.encoded_size_limit();
