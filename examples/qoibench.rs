@@ -31,11 +31,8 @@ SOFTWARE.
 
 */
 
-#![feature(bench_black_box)]
-
 use std::{
     fs::File,
-    hint::black_box,
     io::BufReader,
     path::Path,
     time::{Duration, Instant},
@@ -155,7 +152,7 @@ fn benchmark_image(path: &Path, runs: u32) -> BenchmarkResult {
     // });
 
     benchmark_fn(runs, &mut res.rapid_qoi.decode_time, || {
-        rapid_qoi::Qoi::decode_alloc(black_box(&encoded)).unwrap();
+        rapid_qoi::Qoi::decode_alloc(&encoded).unwrap();
     });
 
     // Encoding
