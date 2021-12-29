@@ -15,7 +15,19 @@ Reference implementation is here 'https://github.com/phoboslab/qoi'
 * no unsafe
 * tiny
 * fast to build (0.8 sec clean build on i9)
-* one of the most efficient implementations of QOI encoder and decoder
+* one of the most efficient implementations of QOI encoder and decoder.
+
+  ```
+  # Grand total for qoi benchmark suite https://qoiformat.org/benchmark/qoi_benchmark_suite.tar
+  # intel i9 with msvc
+
+            decode ms   encode ms   decode mpps   encode mpps
+  qoi:          2.009       2.706        231.01        171.52
+  rapid_qoi:    1.404       2.520        330.72        184.23
+  ```
+  See [benches](./benches) for full reports.\
+  Run `cargo run --release -p bench [iterations] [path]`
+  
 
 ## License
 
