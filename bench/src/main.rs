@@ -1,35 +1,4 @@
-/*
-
-Simple benchmark suite for png, stbi and qoi
-
-Requires libpng, "stb_image.h" and "stb_image_write.h"
-Compile with:
-    gcc qoibench.c -std=gnu99 -lpng -O3 -o qoibench
-
-Dominic Szablewski - https://phoboslab.org
-
-
--- LICENSE: The MIT License(MIT)
-
-Copyright(c) 2021 Dominic Szablewski
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files(the "Software"), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and / or sell copies
-of the Software, and to permit persons to whom the Software is furnished to do
-so, subject to the following conditions :
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
-*/
+//! Simple benchmark suite for qoi crates
 
 use std::{
     fs::File,
@@ -56,16 +25,14 @@ struct BenchmarkResult {
     px: u64,
     w: u32,
     h: u32,
-    qoi: BenchmarkLibResult,
-    qoi_rs: BenchmarkLibResult,
+    // qoi: BenchmarkLibResult,
+    // qoi_rs: BenchmarkLibResult,
     rapid_qoi: BenchmarkLibResult,
 }
 
 #[inline(never)]
 fn benchmark_fn(runs: u32, avg_time: &mut Duration, mut f: impl FnMut()) {
-    for _ in 0..10 {
-        f();
-    }
+    f();
 
     let mut time = Duration::ZERO;
     for _ in 0..runs {
@@ -83,16 +50,16 @@ fn benchmark_image(path: &Path, runs: u32) -> BenchmarkResult {
         px: 0,
         w: 0,
         h: 0,
-        qoi: BenchmarkLibResult {
-            size: 0,
-            encode_time: Duration::ZERO,
-            decode_time: Duration::ZERO,
-        },
-        qoi_rs: BenchmarkLibResult {
-            size: 0,
-            encode_time: Duration::ZERO,
-            decode_time: Duration::ZERO,
-        },
+        // qoi: BenchmarkLibResult {
+        //     size: 0,
+        //     encode_time: Duration::ZERO,
+        //     decode_time: Duration::ZERO,
+        // },
+        // qoi_rs: BenchmarkLibResult {
+        //     size: 0,
+        //     encode_time: Duration::ZERO,
+        //     decode_time: Duration::ZERO,
+        // },
         rapid_qoi: BenchmarkLibResult {
             size: 0,
             encode_time: Duration::ZERO,
@@ -261,16 +228,16 @@ fn benchmark_directory(dirpath: &Path, runs: u32, grand_total: &mut BenchmarkRes
         px: 0,
         w: 0,
         h: 0,
-        qoi: BenchmarkLibResult {
-            size: 0,
-            encode_time: Duration::ZERO,
-            decode_time: Duration::ZERO,
-        },
-        qoi_rs: BenchmarkLibResult {
-            size: 0,
-            encode_time: Duration::ZERO,
-            decode_time: Duration::ZERO,
-        },
+        // qoi: BenchmarkLibResult {
+        //     size: 0,
+        //     encode_time: Duration::ZERO,
+        //     decode_time: Duration::ZERO,
+        // },
+        // qoi_rs: BenchmarkLibResult {
+        //     size: 0,
+        //     encode_time: Duration::ZERO,
+        //     decode_time: Duration::ZERO,
+        // },
         rapid_qoi: BenchmarkLibResult {
             size: 0,
             encode_time: Duration::ZERO,
@@ -317,8 +284,8 @@ fn benchmark_directory(dirpath: &Path, runs: u32, grand_total: &mut BenchmarkRes
                 grand_total.count += res.count;
                 grand_total.px += res.px;
 
-                println!("## {} size: {}x{}\n", filepath.display(), res.w, res.h);
-                benchmark_print_result(&res);
+                // println!("## {} size: {}x{}\n", filepath.display(), res.w, res.h);
+                // benchmark_print_result(&res);
             }
         } else if ft.is_dir() {
             let subdirpath = Path::new(dirpath).join(path.file_name());
@@ -368,16 +335,16 @@ fn main() -> Result<(), ()> {
         px: 0,
         w: 0,
         h: 0,
-        qoi: BenchmarkLibResult {
-            size: 0,
-            encode_time: Duration::ZERO,
-            decode_time: Duration::ZERO,
-        },
-        qoi_rs: BenchmarkLibResult {
-            size: 0,
-            encode_time: Duration::ZERO,
-            decode_time: Duration::ZERO,
-        },
+        // qoi: BenchmarkLibResult {
+        //     size: 0,
+        //     encode_time: Duration::ZERO,
+        //     decode_time: Duration::ZERO,
+        // },
+        // qoi_rs: BenchmarkLibResult {
+        //     size: 0,
+        //     encode_time: Duration::ZERO,
+        //     decode_time: Duration::ZERO,
+        // },
         rapid_qoi: BenchmarkLibResult {
             size: 0,
             encode_time: Duration::ZERO,
@@ -392,13 +359,13 @@ fn main() -> Result<(), ()> {
     if grand_total.count > 0 {
         grand_total.px /= grand_total.count as u64;
 
-        grand_total.qoi.encode_time /= grand_total.count;
-        grand_total.qoi.decode_time /= grand_total.count;
-        grand_total.qoi.size /= grand_total.count as u64;
+        // grand_total.qoi.encode_time /= grand_total.count;
+        // grand_total.qoi.decode_time /= grand_total.count;
+        // grand_total.qoi.size /= grand_total.count as u64;
 
-        grand_total.qoi_rs.encode_time /= grand_total.count;
-        grand_total.qoi_rs.decode_time /= grand_total.count;
-        grand_total.qoi_rs.size /= grand_total.count as u64;
+        // grand_total.qoi_rs.encode_time /= grand_total.count;
+        // grand_total.qoi_rs.decode_time /= grand_total.count;
+        // grand_total.qoi_rs.size /= grand_total.count as u64;
 
         grand_total.rapid_qoi.encode_time /= grand_total.count;
         grand_total.rapid_qoi.decode_time /= grand_total.count;
