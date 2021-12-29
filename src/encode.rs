@@ -1,4 +1,4 @@
-use std::mem::{size_of, take};
+use std::mem::size_of;
 
 use super::*;
 
@@ -138,7 +138,7 @@ impl Qoi {
         loop {
             match chunks.next() {
                 Some(chunk) => {
-                    if likely(rest.len() & !7 > 0) {
+                    if likely(rest.len() > 7) {
                         px.read(chunk);
 
                         if px == *px_prev {
@@ -157,22 +157,10 @@ impl Qoi {
                                     // While not folliwing reference encoder
                                     // this produces valid QOI and have the exactly same size.
                                     // Decoding is slightly faster.
-                                    let index_pos = px.hash();
+                                    let index_pos = px_prev.hash();
                                     rest[0] = QOI_OP_INDEX | index_pos as u8;
                                     rest = &mut rest[1..];
                                     *run = 0;
-                                }
-                                2..=4 => {
-                                    // While not folliwing reference encoder
-                                    // this produces valid QOI and have the exactly same size.
-                                    // Decoding is slightly faster.
-                                    let index_pos = px.hash();
-                                    let byte = QOI_OP_INDEX | index_pos as u8;
-
-                                    for _ in 0..take(run) {
-                                        rest[0] = byte;
-                                        rest = &mut rest[1..];
-                                    }
                                 }
                                 _ => {
                                     rest[0] = QOI_OP_RUN | (*run - 1) as u8;
