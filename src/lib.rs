@@ -172,6 +172,8 @@ const QOI_MAGIC: u32 = u32::from_be_bytes(*b"qoif");
 const QOI_HEADER_SIZE: usize = 14;
 const QOI_PADDING: usize = 8;
 
+/// Trait for pixel types.
+/// Supports byte operations, channels accessing and modifying.
 pub trait Pixel: Copy + Eq {
     const HAS_ALPHA: bool;
 
@@ -214,10 +216,12 @@ pub trait Pixel: Copy + Eq {
     fn hash(&self) -> u8;
 }
 
+/// Thee channel pixel type.
+/// Typically channels are Red, Green and Blue.
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Rgb {
-    rgb: [u8; 3],
+    pub rgb: [u8; 3],
 }
 
 impl Pixel for Rgb {
@@ -332,15 +336,15 @@ impl Pixel for Rgb {
             .wrapping_add(g.wrapping_mul(5))
             .wrapping_add(b.wrapping_mul(7).wrapping_add(245))
             & 63
-
-        // u32::from_be_bytes([r, g, b, 0]).wrapping_mul(MY_HASH_MUL) as u8 & 63
     }
 }
 
+/// Four channel pixel type.
+/// Typically channels are Red, Green, Blue and Alpha.
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Rgba {
-    rgba: [u8; 4],
+    pub rgba: [u8; 4],
 }
 
 impl Pixel for Rgba {
@@ -462,12 +466,14 @@ impl Pixel for Rgba {
     }
 }
 
+/// Color variance value.
+/// Wrapping difference between two pixels.
 #[derive(Clone, Copy)]
 #[repr(C)]
 pub struct Var {
-    r: u8,
-    g: u8,
-    b: u8,
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
 }
 
 impl Var {

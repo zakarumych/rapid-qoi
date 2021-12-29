@@ -55,7 +55,7 @@ impl Display for DecodeError {
 impl std::error::Error for DecodeError {}
 
 impl Qoi {
-    /// Returns decoded pixel data size for the image.
+    /// Returns bytes size for the decoded image.
     #[inline]
     pub fn decoded_size(&self) -> usize {
         self.width as usize * self.height as usize * self.colors.channels()
@@ -101,12 +101,12 @@ impl Qoi {
     #[inline]
     pub fn decode(bytes: &[u8], output: &mut [u8]) -> Result<Self, DecodeError> {
         let qoi = Self::decode_header(bytes)?;
-        qoi.decode_skip_header(bytes, output)?;
+        qoi.decode_skip_header(&bytes[QOI_HEADER_SIZE..], output)?;
         Ok(qoi)
     }
 
     /// Decode a QOI image from bytes slice.\
-    /// Skips header reading, uses provided `Qoi` value instead.\
+    /// `bytes` does not include QOI header. Uses provided `Qoi` value instead.\
     /// Decoded raw RGB or RGBA (depending on `self.colors` value) pixels are written into `output` slice.
     ///
     /// On success this function returns `Ok(())`.\
@@ -126,20 +126,20 @@ impl Qoi {
 
         match self.colors.has_alpha() {
             true => {
-                self.decode_range::<Rgba>(
+                Self::decode_range::<Rgba>(
                     &mut [Rgba::new(); 64],
                     &mut Rgba::new_opaque(),
                     &mut 0,
-                    &bytes[QOI_HEADER_SIZE..],
+                    bytes,
                     output,
                 )?;
             }
             false => {
-                self.decode_range::<Rgb>(
+                Self::decode_range::<Rgb>(
                     &mut [Rgb::new(); 64],
                     &mut Rgb::new_opaque(),
                     &mut 0,
-                    &bytes[QOI_HEADER_SIZE..],
+                    bytes,
                     output,
                 )?;
             }
@@ -147,9 +147,9 @@ impl Qoi {
         Ok(())
     }
 
+    /// Decode range of pixels into output slice.
     #[inline]
-    fn decode_range<P>(
-        &self,
+    pub fn decode_range<P>(
         index: &mut [P; 64],
         px: &mut P,
         run: &mut usize,
@@ -159,8 +159,6 @@ impl Qoi {
     where
         P: Pixel,
     {
-        debug_assert_eq!(self.colors.has_alpha(), P::HAS_ALPHA);
-
         let mut chunks = output.chunks_exact_mut(size_of::<P>());
         let mut rest = bytes;
 
@@ -254,7 +252,6 @@ impl Qoi {
     }
 
     /// Decode a QOI image from bytes slice.\
-    /// Skips header reading, uses provided `Qoi` value instead.\
     /// Decoded raw RGB or RGBA pixels are written into allocated `Vec`.
     ///
     /// On success this function returns `Ok((qoi, vec))` with `qoi` describing image dimensions and color space and `vec` containing raw pixels data.\

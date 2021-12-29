@@ -36,7 +36,7 @@ impl Qoi {
     /// On success this function returns `Ok(())`.\
     /// On failure this function returns `Err(err)` with `err` describing cause of the error.
     #[inline]
-    fn encode(&self, pixels: &[u8], output: &mut [u8]) -> Result<usize, EncodeError> {
+    pub fn encode(&self, pixels: &[u8], output: &mut [u8]) -> Result<usize, EncodeError> {
         if output.len() <= QOI_HEADER_SIZE {
             return Err(EncodeError::OutputIsTooSmall);
         }
@@ -79,14 +79,14 @@ impl Qoi {
         };
 
         let size = match self.colors.has_alpha() {
-            true => self.encode_range::<Rgba>(
+            true => Self::encode_range::<Rgba>(
                 &mut [Rgba::new(); 64],
                 &mut Rgba::new_opaque(),
                 &mut 0,
                 pixels,
                 &mut output[QOI_HEADER_SIZE..],
             )?,
-            false => self.encode_range::<Rgb>(
+            false => Self::encode_range::<Rgb>(
                 &mut [Rgb::new(); 64],
                 &mut Rgb::new_opaque(),
                 &mut 0,
@@ -106,10 +106,8 @@ impl Qoi {
     }
 
     /// Encode range of pixels into output slice.
-    /// This does not include header and end padding.
     #[inline]
     pub fn encode_range<P>(
-        &self,
         index: &mut [P; 64],
         px_prev: &mut P,
         run: &mut usize,
@@ -119,8 +117,6 @@ impl Qoi {
     where
         P: Pixel,
     {
-        debug_assert_eq!(self.colors.has_alpha(), P::HAS_ALPHA);
-
         let mut px = *px_prev;
         let mut rest = &mut output[..];
 
@@ -232,7 +228,7 @@ impl Qoi {
             + QOI_PADDING
     }
 
-    /// Encode raw RGB or RGBA pixels into a QOI image in memory.\
+    /// Encode raw RGB or RGBA pixels into a QOI image.\
     /// Encoded image is written into allocated `Vec`.
     ///
     /// On success this function returns `Ok(vec)` with `vec` containing encoded image.\

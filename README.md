@@ -31,7 +31,7 @@ Reference implementation is here 'https://github.com/phoboslab/qoi'
   rapid_qoi:    1.164       1.844        398.88        251.72
   ```
   See [benches](./benches) for full reports.\
-  Run `cargo run --release -p bench [iterations] [path]`
+  Run `cargo run --release -p bench -- [iterations] [path]`
   
 
 ## License
