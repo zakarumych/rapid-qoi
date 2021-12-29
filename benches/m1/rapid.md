@@ -2,83 +2,82 @@
 ## Total for ../qoi_benchmark_suite/images/textures_pk01
 
           decode ms   encode ms   decode mpps   encode mpps   size kb
-rapid_qoi:    0.331       0.575       393.020       225.788       180
+rapid_qoi:    0.346       0.569       375.247       228.493       178
 
 ## Benchmarking ../qoi_benchmark_suite/images/icon_64/*.png -- 5 runs
 ## Total for ../qoi_benchmark_suite/images/icon_64
 
           decode ms   encode ms   decode mpps   encode mpps   size kb
-rapid_qoi:    0.006       0.010       692.945       430.433         4
+rapid_qoi:    0.006       0.009       642.107       436.674         4
 
 ## Benchmarking ../qoi_benchmark_suite/images/screenshot_game/*.png -- 5 runs
-Failed to open PNG image ../qoi_benchmark_suite/images/screenshot_game/Htdamg_affinity.png : Format error decoding Png: CRC error
 ## Total for ../qoi_benchmark_suite/images/screenshot_game
 
           decode ms   encode ms   decode mpps   encode mpps   size kb
-rapid_qoi:    1.488       2.487       425.835       254.805       542
+rapid_qoi:    1.585       2.483       399.867       255.159       519
 
 ## Benchmarking ../qoi_benchmark_suite/images/textures_pk/*.png -- 5 runs
 ## Total for ../qoi_benchmark_suite/images/textures_pk
 
           decode ms   encode ms   decode mpps   encode mpps   size kb
-rapid_qoi:    0.161       0.279       276.159       159.456        76
+rapid_qoi:    0.169       0.277       264.104       160.457        75
 
 ## Benchmarking ../qoi_benchmark_suite/images/textures_photo/*.png -- 5 runs
 ## Total for ../qoi_benchmark_suite/images/textures_photo
 
           decode ms   encode ms   decode mpps   encode mpps   size kb
-rapid_qoi:    3.523       5.811       297.677       180.455      1984
+rapid_qoi:    3.733       5.789       280.875       181.128      1981
 
 ## Benchmarking ../qoi_benchmark_suite/images/pngimg/*.png -- 5 runs
 ## Total for ../qoi_benchmark_suite/images/pngimg
 
           decode ms   encode ms   decode mpps   encode mpps   size kb
-rapid_qoi:    3.470       5.723       521.270       316.061      1461
+rapid_qoi:    3.591       5.739       503.749       315.172      1436
 
 ## Benchmarking ../qoi_benchmark_suite/images/icon_512/*.png -- 5 runs
 ## Total for ../qoi_benchmark_suite/images/icon_512
 
           decode ms   encode ms   decode mpps   encode mpps   size kb
-rapid_qoi:    0.289       0.507       906.881       516.792        93
+rapid_qoi:    0.299       0.499       875.699       525.181        85
 
 ## Benchmarking ../qoi_benchmark_suite/images/photo_kodak/*.png -- 5 runs
 ## Total for ../qoi_benchmark_suite/images/photo_kodak
 
           decode ms   encode ms   decode mpps   encode mpps   size kb
-rapid_qoi:    1.341       2.260       293.231       173.989       678
+rapid_qoi:    1.415       2.246       277.975       175.105       671
 
 ## Benchmarking ../qoi_benchmark_suite/images/textures_pk02/*.png -- 5 runs
 ## Total for ../qoi_benchmark_suite/images/textures_pk02
 
           decode ms   encode ms   decode mpps   encode mpps   size kb
-rapid_qoi:    0.864       1.566       351.449       193.994       482
+rapid_qoi:    0.904       1.565       335.897       194.114       479
 
 ## Benchmarking ../qoi_benchmark_suite/images/screenshot_web/*.png -- 5 runs
 ## Total for ../qoi_benchmark_suite/images/screenshot_web
 
           decode ms   encode ms   decode mpps   encode mpps   size kb
-rapid_qoi:   10.253      17.408       792.535       466.762      2750
+rapid_qoi:   10.541      17.426       770.877       466.281      2649
 
 ## Benchmarking ../qoi_benchmark_suite/images/photo_tecnick/*.png -- 5 runs
 ## Total for ../qoi_benchmark_suite/images/photo_tecnick
 
           decode ms   encode ms   decode mpps   encode mpps   size kb
-rapid_qoi:    5.412       8.623       266.090       166.998      2542
+rapid_qoi:    5.561       8.669       258.958       166.105      2527
 
 ## Benchmarking ../qoi_benchmark_suite/images/photo_wikipedia/*.png -- 5 runs
 ## Total for ../qoi_benchmark_suite/images/photo_wikipedia
 
           decode ms   encode ms   decode mpps   encode mpps   size kb
-rapid_qoi:    4.224       8.432       256.747       128.613      2108
+rapid_qoi:    4.428       6.719       244.901       161.408      2102
 
 ## Benchmarking ../qoi_benchmark_suite/images/textures_plants/*.png -- 5 runs
 ## Total for ../qoi_benchmark_suite/images/textures_plants
 
           decode ms   encode ms   decode mpps   encode mpps   size kb
-rapid_qoi:    1.968       3.146       540.728       338.155       928
+rapid_qoi:    2.492       3.622       426.975       293.759       922
 
 
 # Grand total for ../qoi_benchmark_suite
 
           decode ms   encode ms   decode mpps   encode mpps   size kb
-rapid_qoi:    1.104       1.864       420.376       249.114       473
+rapid_qoi:    1.164       1.844       398.883       251.719       463
