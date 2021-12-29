@@ -1,6 +1,6 @@
 [package]
 name = "rapid-qoi"
-version = "0.4.3"
+version = "0.5.0"
 edition = "2018"
 authors = []
 license = "MIT OR Apache-2.0"
@@ -8,7 +8,7 @@ documentation = "https://docs.rs/rapid-qoi"
 homepage = "https://github.com/zakarumych/rapid-qoi"
 repository = "https://github.com/zakarumych/rapid-qoi"
 readme = "README.md"
-description = "Optimized QOI format decoder and decoder"
+description = "Optimized QOI format encoder and decoder"
 keywords = ["qoi", "image", "encode", "decode", "no-std"]
 categories = ["algorithms", "compression", "multimedia::encoding", "no-std"]
 
@@ -16,8 +16,7 @@ categories = ["algorithms", "compression", "multimedia::encoding", "no-std"]
 alloc = []
 std = ["alloc"]
 default = ["std"]
+io = ["std"]
 
-[dev-dependencies]
-image = "0.23"
-qoi = "0.3"
-qoi_rs = "0.1"
+[workspace]
+members = ["bench", "qoiconv"]

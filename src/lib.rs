@@ -150,10 +150,16 @@
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
-use core::fmt::{self, Display};
+use core::{
+    convert::TryInto,
+    fmt::{self, Display},
+};
 
 mod decode;
 mod encode;
+
+pub use decode::DecodeError;
+pub use encode::EncodeError;
 
 const QOI_OP_INDEX: u8 = 0x00; /* 00xxxxxx */
 const QOI_OP_DIFF: u8 = 0x40; /* 01xxxxxx */
@@ -166,9 +172,8 @@ const QOI_MAGIC: u32 = u32::from_be_bytes(*b"qoif");
 const QOI_HEADER_SIZE: usize = 14;
 const QOI_PADDING: usize = 8;
 
-trait Pixel: Copy + Eq {
+pub trait Pixel: Copy + Eq {
     const HAS_ALPHA: bool;
-    const CHANNELS: usize;
 
     fn new() -> Self;
 
@@ -179,6 +184,10 @@ trait Pixel: Copy + Eq {
     fn write(&self, bytes: &mut [u8]);
 
     fn var(&self, prev: &Self) -> Var;
+
+    fn rgb(&self) -> [u8; 3];
+
+    fn rgba(&self) -> [u8; 4];
 
     fn r(&self) -> u8;
 
@@ -196,180 +205,254 @@ trait Pixel: Copy + Eq {
 
     fn set_a(&mut self, a: u8);
 
+    fn set_rgb(&mut self, r: u8, g: u8, b: u8);
+
+    fn set_rgba(&mut self, r: u8, g: u8, b: u8, a: u8);
+
+    fn add_rgb(&mut self, r: u8, g: u8, b: u8);
+
     fn hash(&self) -> u8;
 }
 
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq)]
-struct Rgb {
+pub struct Rgb {
     rgb: [u8; 3],
 }
 
 impl Pixel for Rgb {
     const HAS_ALPHA: bool = false;
-    const CHANNELS: usize = 3;
 
-    #[inline(always)]
+    #[inline]
     fn new() -> Self {
         Rgb { rgb: [0; 3] }
     }
 
-    #[inline(always)]
+    #[inline]
     fn new_opaque() -> Self {
         Rgb { rgb: [0; 3] }
     }
 
-    #[inline(always)]
+    #[inline]
     fn read(&mut self, bytes: &[u8]) {
         self.rgb.copy_from_slice(bytes);
     }
 
-    #[inline(always)]
+    #[inline]
     fn write(&self, bytes: &mut [u8]) {
         bytes.copy_from_slice(&self.rgb)
     }
 
-    #[inline(always)]
+    #[inline]
     fn var(&self, prev: &Self) -> Var {
-        let r = self.r().wrapping_sub(prev.r());
-        let g = self.g().wrapping_sub(prev.g());
-        let b = self.b().wrapping_sub(prev.b());
+        let r = self.rgb[0].wrapping_sub(prev.rgb[0]);
+        let g = self.rgb[1].wrapping_sub(prev.rgb[1]);
+        let b = self.rgb[2].wrapping_sub(prev.rgb[2]);
 
         Var { r, g, b }
     }
 
-    #[inline(always)]
+    #[inline]
     fn r(&self) -> u8 {
         self.rgb[0]
     }
 
-    #[inline(always)]
+    #[inline]
     fn g(&self) -> u8 {
         self.rgb[1]
     }
 
-    #[inline(always)]
+    #[inline]
     fn b(&self) -> u8 {
         self.rgb[2]
     }
 
-    #[inline(always)]
+    #[inline]
+    fn rgb(&self) -> [u8; 3] {
+        self.rgb
+    }
+
+    #[inline]
+    fn rgba(&self) -> [u8; 4] {
+        unreachable!()
+    }
+
+    #[inline]
     fn a(&self) -> u8 {
         255
     }
 
-    #[inline(always)]
+    #[inline]
     fn set_r(&mut self, r: u8) {
         self.rgb[0] = r;
     }
 
-    #[inline(always)]
+    #[inline]
     fn set_g(&mut self, g: u8) {
         self.rgb[1] = g;
     }
 
-    #[inline(always)]
+    #[inline]
     fn set_b(&mut self, b: u8) {
         self.rgb[2] = b;
     }
 
-    #[inline(always)]
+    #[inline]
     fn set_a(&mut self, a: u8) {
         debug_assert_eq!(a, 255);
     }
 
-    #[inline(always)]
+    #[inline]
+    fn set_rgb(&mut self, r: u8, g: u8, b: u8) {
+        self.rgb[0] = r;
+        self.rgb[1] = g;
+        self.rgb[2] = b;
+    }
+
+    #[inline]
+    fn set_rgba(&mut self, r: u8, g: u8, b: u8, a: u8) {
+        debug_assert_eq!(a, 255);
+
+        self.rgb[0] = r;
+        self.rgb[1] = g;
+        self.rgb[2] = b;
+    }
+
+    #[inline]
+    fn add_rgb(&mut self, r: u8, g: u8, b: u8) {
+        self.rgb[0] = self.rgb[0].wrapping_add(r);
+        self.rgb[1] = self.rgb[1].wrapping_add(g);
+        self.rgb[2] = self.rgb[2].wrapping_add(b);
+    }
+
+    #[inline]
     fn hash(&self) -> u8 {
         let [r, g, b] = self.rgb;
         r.wrapping_mul(3)
             .wrapping_add(g.wrapping_mul(5))
             .wrapping_add(b.wrapping_mul(7).wrapping_add(245))
             & 63
+
+        // u32::from_be_bytes([r, g, b, 0]).wrapping_mul(MY_HASH_MUL) as u8 & 63
     }
 }
 
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq)]
-struct Rgba {
+pub struct Rgba {
     rgba: [u8; 4],
 }
 
 impl Pixel for Rgba {
     const HAS_ALPHA: bool = true;
-    const CHANNELS: usize = 4;
 
-    #[inline(always)]
+    #[inline]
     fn new() -> Self {
         Rgba { rgba: [0; 4] }
     }
 
-    #[inline(always)]
+    #[inline]
     fn new_opaque() -> Self {
         Rgba { rgba: [0, 0, 0, 1] }
     }
 
-    #[inline(always)]
+    #[inline]
     fn read(&mut self, bytes: &[u8]) {
-        self.rgba.copy_from_slice(bytes);
+        match bytes.try_into() {
+            Ok(rgba) => {
+                self.rgba = rgba;
+            }
+            _ => unreachable(),
+        }
     }
 
-    #[inline(always)]
+    #[inline]
     fn write(&self, bytes: &mut [u8]) {
         bytes.copy_from_slice(&self.rgba)
     }
 
-    #[inline(always)]
+    #[inline]
     fn var(&self, prev: &Self) -> Var {
-        debug_assert_eq!(self.a(), prev.a());
+        let [r, g, b, a] = self.rgba;
+        let [pr, pg, pb, pa] = prev.rgba;
+        debug_assert_eq!(a, pa);
 
-        let r = self.r().wrapping_sub(prev.r());
-        let g = self.g().wrapping_sub(prev.g());
-        let b = self.b().wrapping_sub(prev.b());
+        let r = r.wrapping_sub(pr);
+        let g = g.wrapping_sub(pg);
+        let b = b.wrapping_sub(pb);
 
         Var { r, g, b }
     }
 
-    #[inline(always)]
+    #[inline]
     fn r(&self) -> u8 {
         self.rgba[0]
     }
 
-    #[inline(always)]
+    #[inline]
     fn g(&self) -> u8 {
         self.rgba[1]
     }
 
-    #[inline(always)]
+    #[inline]
     fn b(&self) -> u8 {
         self.rgba[2]
     }
 
-    #[inline(always)]
+    #[inline]
+    fn rgb(&self) -> [u8; 3] {
+        let [r, g, b, _] = self.rgba;
+        [r, g, b]
+    }
+
+    #[inline]
+    fn rgba(&self) -> [u8; 4] {
+        self.rgba
+    }
+
+    #[inline]
     fn a(&self) -> u8 {
         self.rgba[3]
     }
 
-    #[inline(always)]
+    #[inline]
     fn set_r(&mut self, r: u8) {
         self.rgba[0] = r;
     }
 
-    #[inline(always)]
+    #[inline]
     fn set_g(&mut self, g: u8) {
         self.rgba[1] = g;
     }
 
-    #[inline(always)]
+    #[inline]
     fn set_b(&mut self, b: u8) {
         self.rgba[2] = b;
     }
 
-    #[inline(always)]
+    #[inline]
     fn set_a(&mut self, a: u8) {
         self.rgba[3] = a;
     }
 
-    #[inline(always)]
+    #[inline]
+    fn set_rgb(&mut self, r: u8, g: u8, b: u8) {
+        self.rgba = [r, g, b, self.rgba[3]];
+    }
+
+    #[inline]
+    fn set_rgba(&mut self, r: u8, g: u8, b: u8, a: u8) {
+        self.rgba = [r, g, b, a];
+    }
+
+    #[inline]
+    fn add_rgb(&mut self, r: u8, g: u8, b: u8) {
+        self.rgba[0] = self.rgba[0].wrapping_add(r);
+        self.rgba[1] = self.rgba[1].wrapping_add(g);
+        self.rgba[2] = self.rgba[2].wrapping_add(b);
+    }
+
+    #[inline]
     fn hash(&self) -> u8 {
         let [r, g, b, a] = self.rgba;
         r.wrapping_mul(3)
@@ -381,35 +464,34 @@ impl Pixel for Rgba {
 
 #[derive(Clone, Copy)]
 #[repr(C)]
-struct Var {
+pub struct Var {
     r: u8,
     g: u8,
     b: u8,
 }
 
 impl Var {
-    #[inline(always)]
+    #[inline]
     fn diff(&self) -> Option<u8> {
         let r = self.r.wrapping_add(2);
         let g = self.g.wrapping_add(2);
         let b = self.b.wrapping_add(2);
-        if (r | g | b) & !3 == 0 {
-            Some(QOI_OP_DIFF | (r << 4) as u8 | (g << 2) as u8 | b as u8)
-        } else {
-            None
+
+        match r | g | b {
+            0x00..=0x03 => Some(QOI_OP_DIFF | (r << 4) as u8 | (g << 2) as u8 | b as u8),
+            _ => None,
         }
     }
 
-    #[inline(always)]
+    #[inline]
     fn luma(&self) -> Option<[u8; 2]> {
         let r = self.r.wrapping_add(8).wrapping_sub(self.g);
         let g = self.g.wrapping_add(32);
         let b = self.b.wrapping_add(8).wrapping_sub(self.g);
 
-        if (r | b) & 0xF0 == 0 && g & 0xC0 == 0 {
-            Some([QOI_OP_LUMA | g, r << 4 | b])
-        } else {
-            None
+        match (r | b, g) {
+            (0x00..=0x0F, 0x00..=0x3F) => Some([QOI_OP_LUMA | g, r << 4 | b]),
+            _ => None,
         }
     }
 }
@@ -432,11 +514,21 @@ pub enum Colors {
 impl Colors {
     /// Returns `true` if color space has alpha channel.
     /// Returns `false` otherwise.
-    #[inline(always)]
+    #[inline]
     pub const fn has_alpha(&self) -> bool {
         match self {
             Colors::Rgb | Colors::Srgb => false,
             Colors::Rgba | Colors::SrgbLinA => true,
+        }
+    }
+
+    /// Returns `true` if color space has alpha channel.
+    /// Returns `false` otherwise.
+    #[inline]
+    pub const fn channels(&self) -> usize {
+        match self {
+            Colors::Rgb | Colors::Srgb => 3,
+            Colors::Rgba | Colors::SrgbLinA => 4,
         }
     }
 }
@@ -455,86 +547,22 @@ pub struct Qoi {
     pub colors: Colors,
 }
 
-/// Errors that may occur during image encoding.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum EncodeError {
-    /// Pixels buffer is too small for the image.
-    NotEnoughPixelData,
-
-    /// Output buffer is too small to fit encoded image.
-    OutputIsTooSmall,
-}
-
-impl Display for EncodeError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            EncodeError::NotEnoughPixelData => f.write_str("Pixels buffer is too small for image"),
-            EncodeError::OutputIsTooSmall => {
-                f.write_str("Output buffer is too small to fit encoded image")
-            }
-        }
-    }
-}
-
-#[cfg(feature = "std")]
-impl std::error::Error for EncodeError {}
-
-/// Errros that may occur during image decoding.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum DecodeError {
-    /// Buffer does not contain enough encoded data to decode the image.
-    DataIsTooSmall,
-
-    /// Encoded header contains invalid magic value.\
-    /// First four bytes must contain `b"qoif"`.\
-    /// This usually indicates that buffer does not contain QOI image.
-    InvalidMagic,
-
-    /// Encoded header contains invalud channels number.\
-    /// QOI supports only images with `3` or `4` channels.\
-    /// Any other value cannot be produced by valid encoder.
-    InvalidChannelsValue,
-
-    /// Encoded header contains invalud color space value.'
-    /// QOI supports only images with SRGB color channels and linear alpha (if present) denoted by `0` and all linear channels denoted by `1`.\
-    /// Any other value cannot be produced by valid encoder.
-    InvalidColorSpaceValue,
-
-    /// Output buffer is too small to fit decoded image.
-    OutputIsTooSmall,
-}
-
-impl Display for DecodeError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            DecodeError::DataIsTooSmall => {
-                f.write_str("Buffer does not contain enough encoded data to decode whole image")
-            }
-            DecodeError::InvalidMagic => f.write_str("Encoded header contains invalid magic value"),
-            DecodeError::InvalidChannelsValue => {
-                f.write_str("Encoded header contains invalud channels number. Must be 3 or 4")
-            }
-            DecodeError::InvalidColorSpaceValue => {
-                f.write_str("Encoded header contains invalud color space value. Must be 0 or 1")
-            }
-            DecodeError::OutputIsTooSmall => {
-                f.write_str("Output buffer is too small to fit decoded image")
-            }
-        }
-    }
-}
-
-#[cfg(feature = "std")]
-impl std::error::Error for DecodeError {}
-
-#[inline(always)]
+#[inline]
 #[cold]
 fn cold() {}
 
-#[inline(always)]
+#[inline]
 fn likely(b: bool) -> bool {
     if !b {
         cold();
     }
     b
+}
+
+/// Next best thing after `core::hint::unreachable_unchecked()`
+/// If happens to be called this will stall CPU, instead of causing UB.
+#[inline]
+#[cold]
+fn unreachable() -> ! {
+    loop {}
 }

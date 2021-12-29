@@ -63,7 +63,9 @@ struct BenchmarkResult {
 
 #[inline(never)]
 fn benchmark_fn(runs: u32, avg_time: &mut Duration, mut f: impl FnMut()) {
-    f();
+    for _ in 0..10 {
+        f();
+    }
 
     let mut time = Duration::ZERO;
     for _ in 0..runs {
@@ -315,8 +317,8 @@ fn benchmark_directory(dirpath: &Path, runs: u32, grand_total: &mut BenchmarkRes
                 grand_total.count += res.count;
                 grand_total.px += res.px;
 
-                // println!("## {} size: {}x{}\n", filepath.display(), res.w, res.h);
-                // benchmark_print_result(&res);
+                println!("## {} size: {}x{}\n", filepath.display(), res.w, res.h);
+                benchmark_print_result(&res);
             }
         } else if ft.is_dir() {
             let subdirpath = Path::new(dirpath).join(path.file_name());

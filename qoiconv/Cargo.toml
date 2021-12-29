@@ -1,0 +1,9 @@
+[package]
+name = "qoiconv"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+image = "0.23"
+rapid-qoi = { path = ".." }
