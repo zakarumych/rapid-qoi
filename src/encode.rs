@@ -78,30 +78,21 @@ impl Qoi {
             Some(pixels) => pixels,
         };
 
-        let mut run = 8;
         let size = match self.colors.has_alpha() {
-            true => {
-                let mut index = [Rgba::new(); 64];
-                let mut px_prev = Rgba::new_opaque();
-                self.encode_range::<Rgba>(
-                    &mut index,
-                    &mut px_prev,
-                    &mut run,
-                    pixels,
-                    &mut output[QOI_HEADER_SIZE..],
-                )?
-            }
-            false => {
-                let mut index = [Rgb::new(); 64];
-                let mut px_prev = Rgb::new_opaque();
-                self.encode_range::<Rgb>(
-                    &mut index,
-                    &mut px_prev,
-                    &mut run,
-                    pixels,
-                    &mut output[QOI_HEADER_SIZE..],
-                )?
-            }
+            true => self.encode_range::<Rgba>(
+                &mut [Rgba::new(); 64],
+                &mut Rgba::new_opaque(),
+                &mut 0,
+                pixels,
+                &mut output[QOI_HEADER_SIZE..],
+            )?,
+            false => self.encode_range::<Rgb>(
+                &mut [Rgb::new(); 64],
+                &mut Rgb::new_opaque(),
+                &mut 0,
+                pixels,
+                &mut output[QOI_HEADER_SIZE..],
+            )?,
         };
 
         if output.len() < size + QOI_PADDING + QOI_HEADER_SIZE {

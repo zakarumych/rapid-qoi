@@ -18,7 +18,8 @@ Reference implementation is here 'https://github.com/phoboslab/qoi'
 * one of the most efficient implementations of QOI encoder and decoder.
 
   ```
-  # Grand total for qoi benchmark suite https://qoiformat.org/benchmark/qoi_benchmark_suite.tar
+  # Grand total for qoi benchmark suite
+  # https://qoiformat.org/benchmark/qoi_benchmark_suite.tar
 
             decode ms   encode ms   decode mpps   encode mpps
   ## Intel i9
