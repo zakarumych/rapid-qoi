@@ -238,8 +238,13 @@ impl Qoi {
     pub fn encode_alloc(&self, pixels: &[u8]) -> Result<Vec<u8>, EncodeError> {
         let limit = self.encoded_size_limit();
         let mut output = vec![0; limit];
-        let size = self.encode(pixels, &mut output)?;
-        output.truncate(size);
-        Ok(output)
+        match self.encode(pixels, &mut output) {
+            Ok(size) => {
+                output.truncate(size);
+                Ok(output)
+            }
+            Err(EncodeError::OutputIsTooSmall) => unreachable(),
+            Err(err) => Err(err),
+        }
     }
 }
