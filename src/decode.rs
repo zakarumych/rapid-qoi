@@ -1,5 +1,4 @@
 use core::convert::TryInto;
-use std::mem::size_of;
 
 use super::*;
 
@@ -159,7 +158,7 @@ impl Qoi {
     where
         P: Pixel,
     {
-        let mut chunks = output.chunks_exact_mut(size_of::<P>());
+        let mut chunks = output.chunks_exact_mut(P::CHANNELS);
         let mut rest = bytes;
 
         loop {

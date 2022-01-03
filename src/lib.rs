@@ -176,6 +176,7 @@ const QOI_PADDING: usize = 8;
 /// Supports byte operations, channels accessing and modifying.
 pub trait Pixel: Copy + Eq {
     const HAS_ALPHA: bool;
+    const CHANNELS: usize;
 
     fn new() -> Self;
 
@@ -226,6 +227,7 @@ pub struct Rgb {
 
 impl Pixel for Rgb {
     const HAS_ALPHA: bool = false;
+    const CHANNELS: usize = 3;
 
     #[inline]
     fn new() -> Self {
@@ -278,7 +280,7 @@ impl Pixel for Rgb {
 
     #[inline]
     fn rgba(&self) -> [u8; 4] {
-        unreachable!()
+        unreachable()
     }
 
     #[inline]
@@ -331,10 +333,10 @@ impl Pixel for Rgb {
 
     #[inline]
     fn hash(&self) -> u8 {
-        let [r, g, b] = self.rgb;
-        r.wrapping_mul(3)
-            .wrapping_add(g.wrapping_mul(5))
-            .wrapping_add(b.wrapping_mul(7).wrapping_add(245))
+        self.rgb
+            .iter()
+            .zip(&[3u8, 5, 7])
+            .fold(0x35u8, |acc, (a, b)| acc.wrapping_add(a.wrapping_mul(*b)))
             & 63
     }
 }
@@ -349,6 +351,7 @@ pub struct Rgba {
 
 impl Pixel for Rgba {
     const HAS_ALPHA: bool = true;
+    const CHANNELS: usize = 4;
 
     #[inline]
     fn new() -> Self {
@@ -377,13 +380,11 @@ impl Pixel for Rgba {
 
     #[inline]
     fn var(&self, prev: &Self) -> Var {
-        let [r, g, b, a] = self.rgba;
-        let [pr, pg, pb, pa] = prev.rgba;
-        debug_assert_eq!(a, pa);
+        debug_assert_eq!(self.rgba[3], prev.rgba[3]);
 
-        let r = r.wrapping_sub(pr);
-        let g = g.wrapping_sub(pg);
-        let b = b.wrapping_sub(pb);
+        let r = self.rgba[0].wrapping_sub(prev.rgba[0]);
+        let g = self.rgba[1].wrapping_sub(prev.rgba[1]);
+        let b = self.rgba[2].wrapping_sub(prev.rgba[2]);
 
         Var { r, g, b }
     }
@@ -405,8 +406,7 @@ impl Pixel for Rgba {
 
     #[inline]
     fn rgb(&self) -> [u8; 3] {
-        let [r, g, b, _] = self.rgba;
-        [r, g, b]
+        self.rgba[..3].try_into().unwrap()
     }
 
     #[inline]
@@ -441,7 +441,9 @@ impl Pixel for Rgba {
 
     #[inline]
     fn set_rgb(&mut self, r: u8, g: u8, b: u8) {
-        self.rgba = [r, g, b, self.rgba[3]];
+        self.rgba[0] = r;
+        self.rgba[1] = g;
+        self.rgba[2] = b;
     }
 
     #[inline]
@@ -456,20 +458,27 @@ impl Pixel for Rgba {
         self.rgba[2] = self.rgba[2].wrapping_add(b);
     }
 
+    // #[inline]
+    // fn hash(&self) -> u8 {
+    //     self.rgba
+    //         .iter()
+    //         .zip(&[3u8, 5, 7, 11])
+    //         .fold(0u8, |acc, (a, b)| acc.wrapping_add(a.wrapping_mul(*b)))
+    //         & 63
+    // }
+
     #[inline]
     fn hash(&self) -> u8 {
-        let [r, g, b, a] = self.rgba;
-        r.wrapping_mul(3)
-            .wrapping_add(g.wrapping_mul(5))
-            .wrapping_add(b.wrapping_mul(7).wrapping_add(a.wrapping_mul(11)))
-            & 63
+        let v = u32::from_ne_bytes(self.rgba);
+        let s = ((v as u64 & 0xFF00FF00) << 32) | (v as u64 & 0x00FF00FF);
+
+        (s * 0x030007000005000Bu64.to_le()).swap_bytes() as u8 & 63
     }
 }
 
 /// Color variance value.
 /// Wrapping difference between two pixels.
 #[derive(Clone, Copy)]
-#[repr(C)]
 pub struct Var {
     pub r: u8,
     pub g: u8,
@@ -491,9 +500,9 @@ impl Var {
 
     #[inline]
     fn luma(&self) -> Option<[u8; 2]> {
-        let r = self.r.wrapping_add(8).wrapping_sub(self.g);
         let g = self.g.wrapping_add(32);
-        let b = self.b.wrapping_add(8).wrapping_sub(self.g);
+        let r = self.r.wrapping_add(40).wrapping_sub(g);
+        let b = self.b.wrapping_add(40).wrapping_sub(g);
 
         match (r | b, g) {
             (0x00..=0x0F, 0x00..=0x3F) => Some([QOI_OP_LUMA | g, r << 4 | b]),

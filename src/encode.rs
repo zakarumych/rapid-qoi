@@ -1,5 +1,3 @@
-use std::mem::size_of;
-
 use super::*;
 
 #[cfg(feature = "alloc")]
@@ -120,7 +118,7 @@ impl Qoi {
         let mut px = *px_prev;
         let mut rest = &mut output[..];
 
-        let mut chunks = pixels.chunks_exact(size_of::<P>());
+        let mut chunks = pixels.chunks_exact(P::CHANNELS);
 
         loop {
             match chunks.next() {

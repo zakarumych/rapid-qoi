@@ -1,6 +1,6 @@
 [package]
 name = "rapid-qoi"
-version = "0.5.2"
+version = "0.5.4"
 edition = "2018"
 authors = []
 license = "MIT OR Apache-2.0"
