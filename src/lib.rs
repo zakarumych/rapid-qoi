@@ -470,7 +470,7 @@ impl Pixel for Rgba {
     #[inline]
     fn hash(&self) -> u8 {
         let v = u32::from_ne_bytes(self.rgba);
-        let s = ((v as u64 & 0xFF00FF00) << 32) | (v as u64 & 0x00FF00FF);
+        let s = (((v as u64) << 32) | (v as u64)) & 0xFF00FF0000FF00FF;
 
         s.wrapping_mul(0x030007000005000Bu64.to_le()).swap_bytes() as u8 & 63
     }
