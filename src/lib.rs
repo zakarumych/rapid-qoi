@@ -472,7 +472,7 @@ impl Pixel for Rgba {
         let v = u32::from_ne_bytes(self.rgba);
         let s = ((v as u64 & 0xFF00FF00) << 32) | (v as u64 & 0x00FF00FF);
 
-        (s * 0x030007000005000Bu64.to_le()).swap_bytes() as u8 & 63
+        s.wrapping_mul(0x030007000005000Bu64.to_le()).swap_bytes() as u8 & 63
     }
 }
 
