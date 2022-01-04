@@ -28,7 +28,7 @@ Reference implementation is here 'https://github.com/phoboslab/qoi'
   
   ## Apple M1
   qoi:          1.676       2.088        277.01        222.26
-  rapid_qoi:    1.164       1.844        398.88        251.72
+  rapid_qoi:    1.124       1.776        413.13        261.40
   ```
   See [benches](./benches) for full reports.\
   Run `cargo run --release -p bench -- [iterations] [path]`
