@@ -25,10 +25,10 @@ Reference implementation is here 'https://github.com/phoboslab/qoi'
   ## Intel i9
   qoi:          2.009       2.706        231.01        171.52
   rapid_qoi:    1.404       2.520        330.72        184.23
-  
+
   ## Apple M1
   qoi:          1.676       2.088        277.01        222.26
-  rapid_qoi:    1.124       1.776        413.13        261.40
+  rapid_qoi:    1.100       1.836        421.99        252.77
   ```
   See [benches](./benches) for full reports.\
   Run `cargo run --release -p bench -- [iterations] [path]`

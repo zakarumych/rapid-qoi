@@ -125,18 +125,18 @@ impl Qoi {
 
         match self.colors.has_alpha() {
             true => {
-                Self::decode_range::<Rgba>(
-                    &mut [Rgba::new(); 64],
-                    &mut Rgba::new_opaque(),
+                Self::decode_range::<4>(
+                    &mut [Pixel::new(); 64],
+                    &mut Pixel::new_opaque(),
                     &mut 0,
                     bytes,
                     output,
                 )?;
             }
             false => {
-                Self::decode_range::<Rgb>(
-                    &mut [Rgb::new(); 64],
-                    &mut Rgb::new_opaque(),
+                Self::decode_range::<3>(
+                    &mut [Pixel::new(); 64],
+                    &mut Pixel::new_opaque(),
                     &mut 0,
                     bytes,
                     output,
@@ -146,106 +146,151 @@ impl Qoi {
         Ok(())
     }
 
-    /// Decode range of pixels into output slice.
+    /// Decode range of pixels into pixels slice.
     #[inline]
-    pub fn decode_range<P>(
-        index: &mut [P; 64],
-        px: &mut P,
-        run: &mut usize,
+    pub fn decode_range<const N: usize>(
+        index: &mut [[u8; N]; 64],
+        ppx: &mut [u8; N],
+        prun: &mut usize,
         bytes: &[u8],
-        output: &mut [u8],
+        pixels: &mut [u8],
     ) -> Result<usize, DecodeError>
     where
-        P: Pixel,
+        [u8; N]: Pixel,
     {
-        let mut chunks = output.chunks_exact_mut(P::CHANNELS);
+        assert_eq!(pixels.len() % N, 0);
+
+        // let (mut pixels, rem) = pixels.as_chunks_mut::<N>();
+        // let mut pixels = pixels.chunks_exact_mut(N).map(cast_pixel::<N>);
+
+        let mut pixels = bytemuck::cast_slice_mut(pixels);
+
+        // assert!(rem.is_empty());
+
+        let mut px = *ppx;
+
+        if *prun > 0 {
+            // let len = pixels.len();
+
+            let (head, tail) = pixels.split_at_mut((*prun).min(pixels.len()));
+
+            // pixels.by_ref().take(*prun).for_each(|pixel| *pixel = px);
+
+            pixels = tail;
+            head.fill(px);
+
+            if pixels.is_empty() {
+                cold();
+                *prun -= head.len();
+                return Ok(0);
+            } else {
+                *prun = 0;
+            }
+        }
+
         let mut rest = bytes;
 
         loop {
-            match chunks.next() {
-                Some(chunk) => {
-                    match rest.len() {
-                        0..=7 => {
+            match pixels {
+                [out, tail @ ..] => {
+                    // Some(out) => {
+                    pixels = tail;
+                    match rest {
+                        [b1 @ 0b00000000..=0b00111111, tail @ ..] => {
+                            px = index[*b1 as usize];
+                            *out = px;
+
+                            rest = tail;
+                            continue;
+                        }
+                        [b1 @ 0b01000000..=0b01111111, tail @ ..] => {
+                            let vr = ((b1 >> 4) & 0x03).wrapping_sub(2);
+                            let vg = ((b1 >> 2) & 0x03).wrapping_sub(2);
+                            let vb = (b1 & 0x03).wrapping_sub(2);
+                            px.add_rgb(vr, vg, vb);
+
+                            rest = tail;
+                        }
+                        [b1 @ 0b10000000..=0b10111111, b2, tail @ ..] => {
+                            let vg = (b1 & 0x3f).wrapping_sub(32);
+                            let vr = ((b2 >> 4) & 0x0f).wrapping_sub(8).wrapping_add(vg);
+                            let vb = (b2 & 0x0f).wrapping_sub(8).wrapping_add(vg);
+                            px.add_rgb(vr, vg, vb);
+
+                            rest = tail;
+                        }
+                        [0b11111110, b2, b3, b4, tail @ ..] => {
+                            px.set_rgb(*b2, *b3, *b4);
+                            // px[0] = *b2;
+                            // px[1] = *b3;
+                            // px[2] = *b4;
+
+                            rest = tail;
+                        }
+                        [0b11111111, b2, b3, b4, _b5, tail @ ..] if N == 3 => {
                             cold();
-                            return Err(DecodeError::NotEnoughData);
+                            px.set_rgb(*b2, *b3, *b4);
+                            // px[0] = *b2;
+                            // px[1] = *b3;
+                            // px[2] = *b4;
+
+                            rest = tail;
+                        }
+                        [0b11111111, b2, b3, b4, b5, tail @ ..] => {
+                            px.set_rgba(*b2, *b3, *b4, *b5);
+
+                            // px[0] = *b2;
+                            // px[1] = *b3;
+                            // px[2] = *b4;
+                            // px[3] = *b5;
+
+                            rest = tail;
+                        }
+                        [b1 @ 0b11000000..=0b11111101, dtail @ ..] => {
+                            *out = px;
+                            let run = *b1 as usize & 0x3f;
+                            let (head, tail) = pixels.split_at_mut(run);
+                            head.fill(px);
+                            pixels = tail;
+                            rest = dtail;
+
+                            // let len = pixels.len();
+                            // pixels.by_ref().take(run.min(len)).for_each(|out| *out = px);
+
+                            if unlikely(pixels.is_empty()) {
+                                *prun = run - head.len();
+                                break;
+                            }
+
+                            continue;
                         }
                         _ => {
-                            match rest {
-                                [b1 @ 0b00000000..=0b00111111, tail @ ..] => {
-                                    rest = tail;
-                                    *px = index[*b1 as usize];
-                                    px.write(chunk);
-                                    // output = px.write_head(output);
-
-                                    continue;
-                                }
-                                [b1 @ 0b01000000..=0b01111111, tail @ ..] => {
-                                    rest = tail;
-
-                                    let vr = ((b1 >> 4) & 0x03).wrapping_sub(2);
-                                    let vg = ((b1 >> 2) & 0x03).wrapping_sub(2);
-                                    let vb = (b1 & 0x03).wrapping_sub(2);
-                                    px.add_rgb(vr, vg, vb);
-                                }
-                                [b1 @ 0b10000000..=0b10111111, b2, tail @ ..] => {
-                                    rest = tail;
-                                    let vg = (b1 & 0x3f).wrapping_sub(32);
-                                    let vr = ((b2 >> 4) & 0x0f).wrapping_sub(8).wrapping_add(vg);
-                                    let vb = (b2 & 0x0f).wrapping_sub(8).wrapping_add(vg);
-
-                                    px.add_rgb(vr, vg, vb);
-                                }
-                                [0b11111110, b2, b3, b4, tail @ ..] => {
-                                    rest = tail;
-                                    px.set_rgb(*b2, *b3, *b4);
-                                }
-                                [0b11111111, b2, b3, b4, _b5, tail @ ..] if !P::HAS_ALPHA => {
-                                    cold();
-                                    rest = tail;
-                                    px.set_rgb(*b2, *b3, *b4);
-                                }
-                                [0b11111111, b2, b3, b4, b5, tail @ ..] => {
-                                    rest = tail;
-                                    px.set_rgba(*b2, *b3, *b4, *b5);
-                                }
-                                [b1 @ 0b11000000..=0b11111101, tail @ ..] => {
-                                    rest = tail;
-                                    *run = *b1 as usize & 0x3f;
-
-                                    px.write(chunk);
-
-                                    let len = chunks.len();
-                                    chunks.by_ref().take(*run).for_each(|chunk| px.write(chunk));
-
-                                    if len < *run {
-                                        cold();
-                                        *run -= len;
-                                        break;
-                                    } else {
-                                        *run = 0;
-                                    }
-
-                                    continue;
-                                }
-                                _ => {
-                                    // Unreachable arm due to length check above.
-                                    unreachable();
-                                }
-                            }
+                            // if unlikely(rest.len() < QOI_PADDING) {
+                            return Err(DecodeError::NotEnoughData);
+                            // }
+                            // Unreachable arm due to length check above.
+                            // unreachable();
                         }
                     }
+                    //     }
+                    // }
 
-                    index[px.hash() as usize] = *px;
+                    index[px.hash() as usize] = px;
 
-                    px.write(chunk);
+                    // px.write(chunk);
+                    *out = px;
                     // output = px.write_head(output);
                 }
-                None => {
+                [] => {
+                    // None => {
+                    // None => {
                     cold();
                     break;
                 }
             }
         }
+
+        *ppx = px;
 
         Ok(bytes.len() - rest.len())
     }

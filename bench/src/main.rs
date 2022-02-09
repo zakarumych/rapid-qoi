@@ -25,8 +25,7 @@ struct BenchmarkResult {
     px: u64,
     w: u32,
     h: u32,
-    // qoi: BenchmarkLibResult,
-    // qoi_rs: BenchmarkLibResult,
+    qoi: BenchmarkLibResult,
     rapid_qoi: BenchmarkLibResult,
 }
 
@@ -50,16 +49,11 @@ fn benchmark_image(path: &Path, runs: u32) -> BenchmarkResult {
         px: 0,
         w: 0,
         h: 0,
-        // qoi: BenchmarkLibResult {
-        //     size: 0,
-        //     encode_time: Duration::ZERO,
-        //     decode_time: Duration::ZERO,
-        // },
-        // qoi_rs: BenchmarkLibResult {
-        //     size: 0,
-        //     encode_time: Duration::ZERO,
-        //     decode_time: Duration::ZERO,
-        // },
+        qoi: BenchmarkLibResult {
+            size: 0,
+            encode_time: Duration::ZERO,
+            decode_time: Duration::ZERO,
+        },
         rapid_qoi: BenchmarkLibResult {
             size: 0,
             encode_time: Duration::ZERO,
@@ -99,26 +93,11 @@ fn benchmark_image(path: &Path, runs: u32) -> BenchmarkResult {
     .encode_alloc(pixels)
     .unwrap();
 
-    // let encoded_qoi =
-    //     qoi::QoiEncode::qoi_encode_to_vec(pixels, w, h, qoi::Channels::Four, 0).unwrap();
-
-    // let image_qoi_rs = qoi_rs::Image {
-    //     pixels: pixels.clone().into_boxed_slice(),
-    //     width: w as u16,
-    //     height: h as u16,
-    // };
-
-    // let encoded_qoi_rs = qoi_rs::encode(image_qoi_rs, 4).unwrap();
-
     // Decoding
 
-    // benchmark_fn(runs, &mut res.qoi.decode_time, || {
-    //     qoi::QoiDecode::qoi_decode_to_vec(&encoded_qoi, Some(qoi::Channels::Four)).unwrap();
-    // });
-
-    // benchmark_fn(runs, &mut res.qoi_rs.decode_time, || {
-    //     qoi_rs::decode(&encoded_qoi_rs, 4).unwrap();
-    // });
+    benchmark_fn(runs, &mut res.qoi.decode_time, || {
+        qoi::decode_to_vec(&encoded).unwrap();
+    });
 
     benchmark_fn(runs, &mut res.rapid_qoi.decode_time, || {
         rapid_qoi::Qoi::decode_alloc(&encoded).unwrap();
@@ -126,25 +105,11 @@ fn benchmark_image(path: &Path, runs: u32) -> BenchmarkResult {
 
     // Encoding
 
-    // let size = &mut res.qoi.size;
-    // benchmark_fn(runs, &mut res.qoi.encode_time, || {
-    //     let encoded =
-    //         qoi::QoiEncode::qoi_encode_to_vec(pixels, w as u32, h as u32, qoi::Channels::Four, 0xf)
-    //             .unwrap();
-    //     *size = encoded.len() as u64;
-    // });
-
-    // let size = &mut res.qoi_rs.size;
-    // benchmark_fn(runs, &mut res.qoi_rs.encode_time, || {
-    //     let image_qoi_rs = qoi_rs::Image {
-    //         pixels: pixels.clone().into_boxed_slice(),
-    //         width: w as u16,
-    //         height: h as u16,
-    //     };
-
-    //     let encoded_qoi_rs = qoi_rs::encode(image_qoi_rs, 4).unwrap();
-    //     *size = encoded_qoi_rs.len() as u64;
-    // });
+    let size = &mut res.qoi.size;
+    benchmark_fn(runs, &mut res.qoi.encode_time, || {
+        let encoded = qoi::encode_to_vec(pixels, w as u32, h as u32).unwrap();
+        *size = encoded.len() as u64;
+    });
 
     let size = &mut res.rapid_qoi.size;
     benchmark_fn(runs, &mut res.rapid_qoi.encode_time, || {
@@ -163,38 +128,22 @@ fn benchmark_image(path: &Path, runs: u32) -> BenchmarkResult {
 fn benchmark_print_result(res: &BenchmarkResult) {
     let px = res.px as f64;
     println!("          decode ms   encode ms   decode mpps   encode mpps   size kb");
-    // println!(
-    //     "qoi:       {:8.3}    {:8.3}      {:8.3}      {:8.3}  {:8}",
-    //     res.qoi.decode_time.as_secs_f64() * 1000.0,
-    //     res.qoi.encode_time.as_secs_f64() * 1000.0,
-    //     if res.qoi.decode_time.is_zero() {
-    //         0.0
-    //     } else {
-    //         px / (res.qoi.decode_time.as_secs_f64() * 1000_000.0)
-    //     },
-    //     if res.qoi.encode_time.is_zero() {
-    //         0.0
-    //     } else {
-    //         px / (res.qoi.encode_time.as_secs_f64() * 1000_000.0)
-    //     },
-    //     res.qoi.size / 1024,
-    // );
-    // println!(
-    //     "qoi_rs:    {:8.3}    {:8.3}      {:8.3}      {:8.3}  {:8}",
-    //     res.qoi_rs.decode_time.as_secs_f64() * 1000.0,
-    //     res.qoi_rs.encode_time.as_secs_f64() * 1000.0,
-    //     if res.qoi_rs.decode_time.is_zero() {
-    //         0.0
-    //     } else {
-    //         px / (res.qoi_rs.decode_time.as_secs_f64() * 1000_000.0)
-    //     },
-    //     if res.qoi_rs.encode_time.is_zero() {
-    //         0.0
-    //     } else {
-    //         px / (res.qoi_rs.encode_time.as_secs_f64() * 1000_000.0)
-    //     },
-    //     res.qoi_rs.size / 1024,
-    // );
+    println!(
+        "qoi:       {:8.3}    {:8.3}      {:8.3}      {:8.3}  {:8}",
+        res.qoi.decode_time.as_secs_f64() * 1000.0,
+        res.qoi.encode_time.as_secs_f64() * 1000.0,
+        if res.qoi.decode_time.is_zero() {
+            0.0
+        } else {
+            px / (res.qoi.decode_time.as_secs_f64() * 1000_000.0)
+        },
+        if res.qoi.encode_time.is_zero() {
+            0.0
+        } else {
+            px / (res.qoi.encode_time.as_secs_f64() * 1000_000.0)
+        },
+        res.qoi.size / 1024,
+    );
     println!(
         "rapid_qoi: {:8.3}    {:8.3}      {:8.3}      {:8.3}  {:8}",
         res.rapid_qoi.decode_time.as_secs_f64() * 1000.0,
@@ -228,16 +177,11 @@ fn benchmark_directory(dirpath: &Path, runs: u32, grand_total: &mut BenchmarkRes
         px: 0,
         w: 0,
         h: 0,
-        // qoi: BenchmarkLibResult {
-        //     size: 0,
-        //     encode_time: Duration::ZERO,
-        //     decode_time: Duration::ZERO,
-        // },
-        // qoi_rs: BenchmarkLibResult {
-        //     size: 0,
-        //     encode_time: Duration::ZERO,
-        //     decode_time: Duration::ZERO,
-        // },
+        qoi: BenchmarkLibResult {
+            size: 0,
+            encode_time: Duration::ZERO,
+            decode_time: Duration::ZERO,
+        },
         rapid_qoi: BenchmarkLibResult {
             size: 0,
             encode_time: Duration::ZERO,
@@ -257,25 +201,17 @@ fn benchmark_directory(dirpath: &Path, runs: u32, grand_total: &mut BenchmarkRes
                 dir_total.count += res.count;
                 dir_total.px += res.px;
 
-                // dir_total.qoi.encode_time += res.qoi.encode_time;
-                // dir_total.qoi.decode_time += res.qoi.decode_time;
-                // dir_total.qoi.size += res.qoi.size;
-
-                // dir_total.qoi_rs.encode_time += res.qoi_rs.encode_time;
-                // dir_total.qoi_rs.decode_time += res.qoi_rs.decode_time;
-                // dir_total.qoi_rs.size += res.qoi_rs.size;
+                dir_total.qoi.encode_time += res.qoi.encode_time;
+                dir_total.qoi.decode_time += res.qoi.decode_time;
+                dir_total.qoi.size += res.qoi.size;
 
                 dir_total.rapid_qoi.encode_time += res.rapid_qoi.encode_time;
                 dir_total.rapid_qoi.decode_time += res.rapid_qoi.decode_time;
                 dir_total.rapid_qoi.size += res.rapid_qoi.size;
 
-                // grand_total.qoi.encode_time += res.qoi.encode_time;
-                // grand_total.qoi.decode_time += res.qoi.decode_time;
-                // grand_total.qoi.size += res.qoi.size;
-
-                // grand_total.qoi_rs.encode_time += res.qoi_rs.encode_time;
-                // grand_total.qoi_rs.decode_time += res.qoi_rs.decode_time;
-                // grand_total.qoi_rs.size += res.qoi_rs.size;
+                grand_total.qoi.encode_time += res.qoi.encode_time;
+                grand_total.qoi.decode_time += res.qoi.decode_time;
+                grand_total.qoi.size += res.qoi.size;
 
                 grand_total.rapid_qoi.encode_time += res.rapid_qoi.encode_time;
                 grand_total.rapid_qoi.decode_time += res.rapid_qoi.decode_time;
@@ -296,13 +232,9 @@ fn benchmark_directory(dirpath: &Path, runs: u32, grand_total: &mut BenchmarkRes
     if dir_total.count > 0 {
         dir_total.px /= dir_total.count as u64;
 
-        // dir_total.qoi.encode_time /= dir_total.count;
-        // dir_total.qoi.decode_time /= dir_total.count;
-        // dir_total.qoi.size /= dir_total.count as u64;
-
-        // dir_total.qoi_rs.encode_time /= dir_total.count;
-        // dir_total.qoi_rs.decode_time /= dir_total.count;
-        // dir_total.qoi_rs.size /= dir_total.count as u64;
+        dir_total.qoi.encode_time /= dir_total.count;
+        dir_total.qoi.decode_time /= dir_total.count;
+        dir_total.qoi.size /= dir_total.count as u64;
 
         dir_total.rapid_qoi.encode_time /= dir_total.count;
         dir_total.rapid_qoi.decode_time /= dir_total.count;
@@ -335,16 +267,11 @@ fn main() -> Result<(), ()> {
         px: 0,
         w: 0,
         h: 0,
-        // qoi: BenchmarkLibResult {
-        //     size: 0,
-        //     encode_time: Duration::ZERO,
-        //     decode_time: Duration::ZERO,
-        // },
-        // qoi_rs: BenchmarkLibResult {
-        //     size: 0,
-        //     encode_time: Duration::ZERO,
-        //     decode_time: Duration::ZERO,
-        // },
+        qoi: BenchmarkLibResult {
+            size: 0,
+            encode_time: Duration::ZERO,
+            decode_time: Duration::ZERO,
+        },
         rapid_qoi: BenchmarkLibResult {
             size: 0,
             encode_time: Duration::ZERO,
@@ -359,13 +286,9 @@ fn main() -> Result<(), ()> {
     if grand_total.count > 0 {
         grand_total.px /= grand_total.count as u64;
 
-        // grand_total.qoi.encode_time /= grand_total.count;
-        // grand_total.qoi.decode_time /= grand_total.count;
-        // grand_total.qoi.size /= grand_total.count as u64;
-
-        // grand_total.qoi_rs.encode_time /= grand_total.count;
-        // grand_total.qoi_rs.decode_time /= grand_total.count;
-        // grand_total.qoi_rs.size /= grand_total.count as u64;
+        grand_total.qoi.encode_time /= grand_total.count;
+        grand_total.qoi.decode_time /= grand_total.count;
+        grand_total.qoi.size /= grand_total.count as u64;
 
         grand_total.rapid_qoi.encode_time /= grand_total.count;
         grand_total.rapid_qoi.decode_time /= grand_total.count;

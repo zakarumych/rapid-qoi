@@ -6,6 +6,6 @@ publish=false
 
 [dependencies]
 rapid-qoi = { path = ".." }
-image = "0.23"
-qoi = "0.3"
+image = "0.24"
+qoi = "0.4"
 qoi_rs = "0.1"

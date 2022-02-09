@@ -1,6 +1,6 @@
 [package]
 name = "rapid-qoi"
-version = "0.5.5"
+version = "0.6.0"
 edition = "2018"
 authors = []
 license = "MIT OR Apache-2.0"
@@ -17,6 +17,9 @@ alloc = []
 std = ["alloc"]
 default = ["std"]
 io = ["std"]
+
+[dependencies]
+bytemuck = { version = "1.0", features = ["min_const_generics"] }
 
 [workspace]
 members = ["bench", "qoiconv"]

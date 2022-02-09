@@ -77,16 +77,16 @@ impl Qoi {
         };
 
         let size = match self.colors.has_alpha() {
-            true => Self::encode_range::<Rgba>(
-                &mut [Rgba::new(); 64],
-                &mut Rgba::new_opaque(),
+            true => Self::encode_range::<4>(
+                &mut [Pixel::new(); 64],
+                &mut Pixel::new_opaque(),
                 &mut 0,
                 pixels,
                 &mut output[QOI_HEADER_SIZE..],
             )?,
-            false => Self::encode_range::<Rgb>(
-                &mut [Rgb::new(); 64],
-                &mut Rgb::new_opaque(),
+            false => Self::encode_range::<3>(
+                &mut [Pixel::new(); 64],
+                &mut Pixel::new_opaque(),
                 &mut 0,
                 pixels,
                 &mut output[QOI_HEADER_SIZE..],
@@ -105,30 +105,31 @@ impl Qoi {
 
     /// Encode range of pixels into output slice.
     #[inline]
-    pub fn encode_range<P>(
-        index: &mut [P; 64],
-        px_prev: &mut P,
+    pub fn encode_range<const N: usize>(
+        index: &mut [[u8; N]; 64],
+        px_prev: &mut [u8; N],
         run: &mut usize,
         pixels: &[u8],
         output: &mut [u8],
     ) -> Result<usize, EncodeError>
     where
-        P: Pixel,
+        [u8; N]: Pixel,
     {
-        let mut px = *px_prev;
-        let mut rest = &mut output[..];
+        let mut rest = &mut *output;
 
-        let mut chunks = pixels.chunks_exact(P::CHANNELS);
+        assert_eq!(pixels.len() % N, 0);
+
+        // let mut chunks = pixels.chunks_exact(N);
+        let mut pixels = bytemuck::cast_slice::<_, [u8; N]>(pixels);
 
         loop {
-            match chunks.next() {
-                Some(chunk) => {
+            match pixels {
+                // Some(chunk) => {
+                [px, tail @ ..] => {
+                    pixels = tail;
                     if likely(rest.len() > 7) {
-                        px.read(chunk);
-
-                        if px == *px_prev {
-                            if *run == 61 || chunks.len() == 0 {
-                                cold();
+                        if *px == *px_prev {
+                            if *run == 61 || unlikely(pixels.is_empty()) {
                                 rest[0] = QOI_OP_RUN | (*run as u8);
                                 rest = &mut rest[1..];
                                 *run = 0;
@@ -139,11 +140,15 @@ impl Qoi {
                             match run {
                                 0 => {}
                                 1 => {
-                                    // While not folliwing reference encoder
+                                    // While not following reference encoder
                                     // this produces valid QOI and have the exactly same size.
                                     // Decoding is slightly faster.
                                     let index_pos = px_prev.hash();
-                                    rest[0] = QOI_OP_INDEX | index_pos as u8;
+                                    if unlikely(index_pos == 0x35 && index[0x35] == [0; N]) {
+                                        rest[0] = QOI_OP_RUN;
+                                    } else {
+                                        rest[0] = QOI_OP_INDEX | index_pos as u8;
+                                    }
                                     rest = &mut rest[1..];
                                     *run = 0;
                                 }
@@ -158,13 +163,13 @@ impl Qoi {
                                 [b1, b2, b3, b4, b5, ..] => {
                                     let index_pos = px.hash();
 
-                                    if index[index_pos as usize] == px {
+                                    if index[index_pos as usize] == *px {
                                         *b1 = QOI_OP_INDEX | index_pos as u8;
                                         rest = &mut rest[1..];
                                     } else {
-                                        index[index_pos as usize] = px;
+                                        index[index_pos as usize] = *px;
 
-                                        if P::HAS_ALPHA && px_prev.a() != px.a() {
+                                        if N == 4 && px_prev.a() != px.a() {
                                             cold();
                                             let [r, g, b, a] = px.rgba();
                                             *b1 = QOI_OP_RGBA;
@@ -174,7 +179,7 @@ impl Qoi {
                                             *b5 = a;
                                             rest = &mut rest[5..];
                                         } else {
-                                            let v = px.var(&px_prev);
+                                            let v = px.var(px_prev);
 
                                             if let Some(diff) = v.diff() {
                                                 *b1 = diff;
@@ -193,7 +198,7 @@ impl Qoi {
                                             }
                                         }
                                     }
-                                    *px_prev = px;
+                                    *px_prev = *px;
                                 }
                                 _ => {
                                     cold();
@@ -205,7 +210,8 @@ impl Qoi {
                         return Err(EncodeError::OutputIsTooSmall);
                     }
                 }
-                None => {
+                // None => {
+                [] => {
                     cold();
                     break;
                 }
