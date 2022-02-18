@@ -145,6 +145,8 @@
 //! 8-bit  blue channel value\
 //! 8-bit alpha channel value
 #![forbid(unsafe_code)]
+#![deny(missing_copy_implementations)]
+#![deny(missing_debug_implementations)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(feature = "alloc")]
@@ -479,7 +481,7 @@ impl Pixel for [u8; 4] {
 
 /// Color variance value.
 /// Wrapping difference between two pixels.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct Var {
     pub r: u8,
@@ -514,6 +516,7 @@ impl Var {
 }
 
 /// Image color space variants.
+#[derive(Clone, Copy, Debug)]
 pub enum Colors {
     /// SRGB color channels.
     Srgb,
@@ -553,6 +556,7 @@ impl Colors {
 /// QOI descriptor value.\
 /// This value is parsed from image header during decoding.\
 /// Or provided by caller to drive encoding.
+#[derive(Clone, Copy, Debug)]
 pub struct Qoi {
     /// Width of the image in pixels.
     pub width: u32,
