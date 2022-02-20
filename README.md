@@ -10,7 +10,6 @@ Fast implementation of QOI format.
 Reference implementation is here 'https://github.com/phoboslab/qoi'
 
 `rapid-qoi` is
-* no deps
 * no std
 * no unsafe
 * tiny
