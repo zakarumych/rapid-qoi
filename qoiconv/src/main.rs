@@ -1,6 +1,12 @@
-use std::{fs::File, io::BufReader, path::PathBuf};
+use std::path::PathBuf;
 
 use image::{DynamicImage, ImageFormat};
+
+enum Format {
+    Qoi,
+    Raw,
+    Image(image::ImageFormat),
+}
 
 fn main() -> Result<(), ()> {
     let mut args = std::env::args();
@@ -15,10 +21,25 @@ fn main() -> Result<(), ()> {
 
     let input = PathBuf::from(args.next().unwrap());
 
-    let decode = input.extension().map_or(false, |ext| ext == "qoi");
+    let input_format = match input.extension() {
+        Some(ext) => match ext {
+            _ if ext == "qoi" => Format::Qoi,
+            _ if ext == "raw" => panic!("RAW is unsupported as input format"),
+            _ => Format::Image(ImageFormat::from_extension(ext).ok_or_else(|| {
+                eprintln!(
+                    "Failed to pick output format based on extension '{:?}'",
+                    ext
+                )
+            })?),
+        },
+        None => {
+            eprintln!("Failed to pick output format without extension");
+            return Err(());
+        }
+    };
 
     let output = args.next().map(PathBuf::from).unwrap_or_else(|| {
-        if decode {
+        if let Format::Qoi = input_format {
             input.with_extension("png")
         } else {
             input.with_extension("qoi")
@@ -30,76 +51,66 @@ fn main() -> Result<(), ()> {
         return Err(());
     }
 
-    if decode {
-        let bytes = std::fs::read(&input)
-            .map_err(|err| eprintln!("Failed to read QOI file '{}'. {:#}", input.display(), err))?;
-
-        let (qoi, pixels) = rapid_qoi::Qoi::decode_alloc(&bytes).map_err(|err| {
-            eprintln!(
-                "Failed to decode QOI image '{}'. {:#?}",
-                input.display(),
-                err
-            )
-        })?;
-
-        let format = match output.extension() {
-            Some(ext) => ImageFormat::from_extension(ext).ok_or_else(|| {
+    let output_format = match output.extension() {
+        Some(ext) => match ext {
+            _ if ext == "qoi" => Format::Qoi,
+            _ if ext == "raw" => Format::Raw,
+            _ => Format::Image(ImageFormat::from_extension(ext).ok_or_else(|| {
                 eprintln!(
                     "Failed to pick output format based on extension '{:?}'",
                     ext
                 )
-            })?,
-            None => {
-                eprintln!("Failed to pick output format without extension");
-                return Err(());
-            }
-        };
-
-        match qoi.colors.has_alpha() {
-            true => image::save_buffer_with_format(
-                &output,
-                &pixels,
-                qoi.width,
-                qoi.height,
-                image::ColorType::Rgba8,
-                format,
-            ),
-            false => image::save_buffer_with_format(
-                &output,
-                &pixels,
-                qoi.width,
-                qoi.height,
-                image::ColorType::Rgb8,
-                format,
-            ),
+            })?),
+        },
+        None => {
+            eprintln!("Failed to pick output format without extension");
+            return Err(());
         }
-        .map_err(|err| {
-            eprintln!(
-                "Failed to save decoded image into '{}'. {:#}",
-                output.display(),
-                err
-            )
-        })?;
-    } else {
-        let image = image::load(
-            BufReader::new(File::open(&input).unwrap()),
-            image::ImageFormat::Png,
-        )
-        .map_err(|err| {
-            eprintln!(
-                "Failed to open input image '{}'. {:#}",
-                input.display(),
-                err
-            )
-        })?;
+    };
 
-        match image {
-            DynamicImage::ImageBgra8(_)
+    let bytes = std::fs::read(&input)
+        .map_err(|err| eprintln!("Failed to read QOI file '{}'. {:#}", input.display(), err))?;
+
+    let dynamic_image = match input_format {
+        Format::Qoi => {
+            let (qoi, pixels) = rapid_qoi::Qoi::decode_alloc(&bytes).map_err(|err| {
+                eprintln!(
+                    "Failed to decode QOI image '{}'. {:#?}",
+                    input.display(),
+                    err
+                )
+            })?;
+
+            match qoi.colors.has_alpha() {
+                true => image::DynamicImage::ImageRgba8(
+                    image::RgbaImage::from_raw(qoi.width, qoi.height, pixels).unwrap(),
+                ),
+                false => image::DynamicImage::ImageRgb8(
+                    image::RgbImage::from_raw(qoi.width, qoi.height, pixels).unwrap(),
+                ),
+            }
+        }
+        Format::Raw => unreachable!(),
+        Format::Image(format) => {
+            image::load_from_memory_with_format(&bytes, format).map_err(|err| {
+                eprintln!(
+                    "Failed to open input image '{}'. {:#}",
+                    input.display(),
+                    err
+                )
+            })?
+        }
+    };
+
+    match output_format {
+        Format::Qoi => match dynamic_image {
+            DynamicImage::ImageLuma16(_)
+            | DynamicImage::ImageLuma8(_)
             | DynamicImage::ImageLumaA16(_)
             | DynamicImage::ImageLumaA8(_)
             | DynamicImage::ImageRgba16(_)
             | DynamicImage::ImageRgba8(_) => {
-                let rgba = image.to_rgba8();
+                let rgba = dynamic_image.to_rgba8();
                 let pixels = rgba.as_raw();
 
                 let qoi = rapid_qoi::Qoi {
@@ -125,7 +136,7 @@ fn main() -> Result<(), ()> {
                 })?;
             }
             _ => {
-                let rgb = image.to_rgb8();
+                let rgb = dynamic_image.to_rgb8();
                 let pixels = rgb.as_raw();
 
                 let qoi = rapid_qoi::Qoi {
@@ -150,6 +161,28 @@ fn main() -> Result<(), ()> {
                     )
                 })?;
             }
+        },
+
+        Format::Raw => {
+            std::fs::write(&output, &dynamic_image.as_bytes()).map_err(|err| {
+                eprintln!(
+                    "Failed to write RAW image into output file {}. {:#}",
+                    output.display(),
+                    err
+                )
+            })?;
+        }
+
+        Format::Image(format) => {
+            dynamic_image
+                .save_with_format(&output, format)
+                .map_err(|err| {
+                    eprintln!(
+                        "Failed to save image into '{}'. {:#}",
+                        output.display(),
+                        err
+                    )
+                })?;
         }
     }
 

@@ -273,7 +273,7 @@ impl Pixel for [u8; 3] {
 
     #[inline]
     fn rgba(&self) -> [u8; 4] {
-        unreachable!()
+        [self[0], self[1], self[2], 255]
     }
 
     #[inline]
