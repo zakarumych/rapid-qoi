@@ -135,12 +135,12 @@ fn benchmark_print_result(res: &BenchmarkResult) {
         if res.qoi.decode_time.is_zero() {
             0.0
         } else {
-            px / (res.qoi.decode_time.as_secs_f64() * 1000_000.0)
+            px / (res.qoi.decode_time.as_secs_f64() * 1_000_000.0)
         },
         if res.qoi.encode_time.is_zero() {
             0.0
         } else {
-            px / (res.qoi.encode_time.as_secs_f64() * 1000_000.0)
+            px / (res.qoi.encode_time.as_secs_f64() * 1_000_000.0)
         },
         res.qoi.size / 1024,
     );
@@ -151,12 +151,12 @@ fn benchmark_print_result(res: &BenchmarkResult) {
         if res.rapid_qoi.decode_time.is_zero() {
             0.0
         } else {
-            px / (res.rapid_qoi.decode_time.as_secs_f64() * 1000_000.0)
+            px / (res.rapid_qoi.decode_time.as_secs_f64() * 1_000_000.0)
         },
         if res.rapid_qoi.encode_time.is_zero() {
             0.0
         } else {
-            px / (res.rapid_qoi.encode_time.as_secs_f64() * 1000_000.0)
+            px / (res.rapid_qoi.encode_time.as_secs_f64() * 1_000_000.0)
         },
         res.rapid_qoi.size / 1024,
     );
