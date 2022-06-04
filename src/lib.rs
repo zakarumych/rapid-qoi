@@ -524,7 +524,7 @@ pub enum Colors {
     /// SRGB color channels and linear alpha channel.
     SrgbLinA,
 
-    /// Lineear color channels.
+    /// Linear color channels.
     Rgb,
 
     /// Linear color and alpha channels.
@@ -542,8 +542,8 @@ impl Colors {
         }
     }
 
-    /// Returns `true` if color space has alpha channel.
-    /// Returns `false` otherwise.
+    /// Returns `4` if color space has alpha channel.
+    /// Returns `3` otherwise.
     #[inline]
     pub const fn channels(&self) -> usize {
         match self {
