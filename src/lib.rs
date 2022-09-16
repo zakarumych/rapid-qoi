@@ -582,7 +582,7 @@ const fn likely(b: bool) -> bool {
 
 #[inline]
 const fn unlikely(b: bool) -> bool {
-    if !b {
+    if b {
         cold();
     }
     b
