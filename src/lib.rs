@@ -339,7 +339,7 @@ impl Pixel for [u8; 3] {
         let v = u32::from_ne_bytes([r, g, b, 0xff]);
         let s = (((v as u64) << 32) | (v as u64)) & 0xFF00FF0000FF00FF;
 
-        s.wrapping_mul(0x030007000005000Bu64.to_le()).swap_bytes() as u8 & 63
+        (s.wrapping_mul(0x0C001C000014002C_u64.to_le()) >> 58) as u8
     }
 }
 
@@ -475,7 +475,7 @@ impl Pixel for [u8; 4] {
         let v = u32::from_ne_bytes(*self);
         let s = (((v as u64) << 32) | (v as u64)) & 0xFF00FF0000FF00FF;
 
-        s.wrapping_mul(0x0C001C000014002C_u64.to_le()) >> 58 as u8
+        (s.wrapping_mul(0x0C001C000014002C_u64.to_le()) >> 58) as u8
     }
 }
 
