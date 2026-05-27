@@ -249,7 +249,7 @@ impl Qoi {
                         [b1 @ 0b11000000..=0b11111101, dtail @ ..] => {
                             *out = px;
                             let run = *b1 as usize & 0x3f;
-                            let (head, tail) = pixels.split_at_mut(run);
+                            let (head, tail) = pixels.split_at_mut(run.min(pixels.len()));
                             head.fill(px);
                             pixels = tail;
                             rest = dtail;
