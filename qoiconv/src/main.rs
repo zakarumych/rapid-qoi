@@ -13,7 +13,7 @@ fn main() -> Result<(), ()> {
 
     if args.len() < 2 {
         eprintln!("Usage: qoiconv <input-path> [<output-path>]");
-        eprintln!("Example: qoiconv images/foo.png images.foo.qoi");
+        eprintln!("Example: qoiconv image.png image.qoi");
         return Err(());
     }
 

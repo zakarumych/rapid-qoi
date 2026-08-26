@@ -163,7 +163,7 @@ impl Qoi {
         // let (mut pixels, rem) = pixels.as_chunks_mut::<N>();
         // let mut pixels = pixels.chunks_exact_mut(N).map(cast_pixel::<N>);
 
-        let mut pixels = bytemuck::cast_slice_mut(pixels);
+        let mut pixels = pixels.as_chunks_mut().0;
 
         // assert!(rem.is_empty());
 

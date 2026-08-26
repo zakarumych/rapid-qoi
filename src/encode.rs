@@ -119,8 +119,7 @@ impl Qoi {
 
         assert_eq!(pixels.len() % N, 0);
 
-        // let mut chunks = pixels.chunks_exact(N);
-        let mut pixels = bytemuck::cast_slice::<_, [u8; N]>(pixels);
+        let mut pixels = pixels.as_chunks().0;
 
         loop {
             match pixels {
